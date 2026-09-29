@@ -293,6 +293,7 @@ func Main_init() string {
 	}
 
 	Always_init(db, last_version["c_ver"])
+	Ensure_slbm_defaults(db)
 	Get_ip_select(db)
 	Search_index_start()
 	return now_version
