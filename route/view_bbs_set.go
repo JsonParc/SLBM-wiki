@@ -1,0 +1,156 @@
+package route
+
+import (
+	"database/sql"
+	"net/url"
+	"strings"
+
+	"opennamu/route/tool"
+	"opennamu/route/tool/markup"
+)
+
+var bbs_set_fields = []string{
+	"bbs_view_acl",
+	"bbs_only_my_data_view_acl",
+	"bbs_acl",
+	"bbs_edit_acl",
+	"bbs_comment_acl",
+}
+
+func Bbs_set_value(db *sql.DB, set_id string, set_name string) string {
+	return tool.Get_bbs_set_data(db, set_id, set_name)
+}
+
+func Bbs_prefix_list(db *sql.DB, set_id string) []string {
+	value := strings.ReplaceAll(Bbs_set_value(db, set_id, "bbs_prefix"), "\r", "")
+	prefix_list := []string{}
+	for _, prefix := range strings.Split(value, "\n") {
+		prefix = strings.TrimSpace(prefix)
+		if prefix != "" && !tool.Arr_in_str(prefix_list, prefix) {
+			prefix_list = append(prefix_list, prefix)
+		}
+	}
+	return prefix_list
+}
+
+func Bbs_prefix_check(db *sql.DB, set_id string, prefix string) string {
+	prefix = strings.TrimSpace(prefix)
+	if tool.Arr_in_str(Bbs_prefix_list(db, set_id), prefix) {
+		return prefix
+	}
+	return ""
+}
+
+func Bbs_tag_list(data string) []string {
+	data = strings.ReplaceAll(data, "\r", "")
+	data = strings.ReplaceAll(data, "\n", ",")
+
+	tag_list := []string{}
+	for _, tag := range strings.Split(data, ",") {
+		tag = strings.TrimSpace(tag)
+		if tag != "" && !tool.Arr_in_str(tag_list, tag) {
+			tag_list = append(tag_list, tag)
+		}
+	}
+
+	return tag_list
+}
+
+const bbs_title_max_length = 128
+const bbs_tag_max_length = 64
+
+func Acl_value_valid(db *sql.DB, value string) bool {
+	if tool.Arr_in_str(tool.List_acl("normal"), value) {
+		return true
+	}
+	return tool.Auth_group_exists(db, value) || tool.Auth_permission_name(value)
+}
+
+func Acl_value_list(db *sql.DB, selected string) []string {
+	values := tool.List_acl("normal")
+	for _, choice := range tool.Auth_choices() {
+		if !tool.Arr_in_str(values, choice.Key) {
+			values = append(values, choice.Key)
+		}
+	}
+	for _, group := range tool.List_auth(db) {
+		if !tool.Arr_in_str(values, group) {
+			values = append(values, group)
+		}
+	}
+	if selected != "" && !tool.Arr_in_str(values, selected) {
+		values = append([]string{selected}, values...)
+	}
+	return values
+}
+
+func View_bbs_set(config tool.Config, set_id string, values url.Values) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+	if Bbs_is_special_board(set_id) && set_id != "0" && set_id != thread_bbs_id {
+		return tool.Get_redirect("/bbs/in/" + tool.Url_parser(set_id))
+	}
+
+	bbs_name := Bbs_set_value(db, set_id, "bbs_name")
+	if bbs_name == "" {
+		return tool.Get_redirect("/bbs/main")
+	}
+	if values == nil && !tool.Check_permission(db, "bbs_setting", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	if values != nil {
+		if !tool.Check_permission(db, "bbs_setting", config.IP) {
+			return tool.Get_error_page(db, config, "auth")
+		}
+		for _, field := range bbs_set_fields {
+			Api_bbs_w_set_put(config, set_id, field, values.Get(field), "")
+		}
+		Api_bbs_w_set_put(config, set_id, "bbs_markup", values.Get("bbs_markup"), "")
+		Api_bbs_w_set_put(config, set_id, "bbs_name", values.Get("bbs_name"), "")
+		Api_bbs_w_set_put(config, set_id, "bbs_prefix", values.Get("bbs_prefix"), "")
+		Api_bbs_w_set_put(config, set_id, "bbs_placeholder", values.Get("bbs_placeholder"), "")
+		Api_bbs_w_set_put(config, set_id, "bbs_comment_placeholder", values.Get("bbs_comment_placeholder"), "")
+		Api_bbs_w_set_put(config, set_id, "bbs_excellent_min", values.Get("bbs_excellent_min"), "")
+		return tool.Get_redirect("/bbs/set/" + tool.Url_parser(set_id))
+	}
+
+	data := `<form method="post">`
+	for _, field := range bbs_set_fields {
+		selected := Bbs_set_value(db, set_id, field)
+		data += `<h3>` + tool.Get_language(db, field, true) + `</h3>`
+		data += tool.Build_select(field, Acl_value_list(db, selected), selected, tool.Get_language(db, "normal", true))
+		data += `<hr class="main_hr">`
+	}
+
+	markup_values := markup.List_markup()
+	data += `<h3>` + tool.Get_language(db, "markup", true) + `</h3>`
+	data += tool.Build_select("bbs_markup", markup_values, Bbs_set_value(db, set_id, "bbs_markup"), tool.Get_language(db, "normal", true))
+	data += `<hr class="main_hr"><h3>` + tool.Get_language(db, "bbs_name", true) + `</h3>`
+	data += `<input name="bbs_name" value="` + tool.HTML_escape(bbs_name) + `"><hr class="main_hr">`
+	data += "<h3>" + tool.Get_language(db, "bbs_prefix", true) + "</h3>"
+	data += "<textarea class=\"opennamu_textarea_100\" name=\"bbs_prefix\">" + tool.HTML_escape(Bbs_set_value(db, set_id, "bbs_prefix")) + "</textarea><hr class=\"main_hr\">"
+	data += "<h3>" + tool.Get_language(db, "bbs_placeholder", true) + "</h3>"
+	data += "<textarea class=\"opennamu_textarea_100\" name=\"bbs_placeholder\">" + tool.HTML_escape(Bbs_set_value(db, set_id, "bbs_placeholder")) + "</textarea><hr class=\"main_hr\">"
+	data += "<h3>" + tool.Get_language(db, "bbs_comment_placeholder", true) + "</h3>"
+	data += "<textarea class=\"opennamu_textarea_100\" name=\"bbs_comment_placeholder\">" + tool.HTML_escape(Bbs_set_value(db, set_id, "bbs_comment_placeholder")) + "</textarea><hr class=\"main_hr\">"
+	data += "<h3>" + tool.Get_language(db, "bbs_excellent_min_board", true) + "</h3>"
+	data += Setting_input("bbs_excellent_min", Bbs_set_value(db, set_id, "bbs_excellent_min"), "number") + "<hr class=\"main_hr\">"
+	data += `<button type="submit">` + tool.Get_language(db, "save", true) + `</button></form>`
+
+	menu := [][]any{
+		{"bbs/in/" + tool.Url_parser(set_id), tool.Get_language(db, "return", true)},
+	}
+	if !Bbs_is_special_board(set_id) && tool.Check_permission(db, "bbs_delete", config.IP) {
+		menu = append(menu, []any{"bbs/delete/" + tool.Url_parser(set_id), tool.Get_language(db, "delete", true)})
+	}
+
+	return tool.Get_template(
+		db,
+		config,
+		tool.Get_language(db, "bbs_set", true),
+		data,
+		[]any{"(" + bbs_name + ")"},
+		menu,
+		map[string]string{},
+	)
+}

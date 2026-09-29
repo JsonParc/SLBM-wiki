@@ -1,0 +1,55 @@
+package route
+
+import "opennamu/route/tool"
+
+func View_bbs_in_w_comment_tool(config tool.Config, set_id string, set_code string, comment_id string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if _, allowed := Bbs_post_view_auth(db, set_id, set_code, config.IP); !allowed {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	data_html := `
+        <h2>` + tool.Get_language(db, "tool", true) + `</h2>
+        <ul>
+            <li><a href="/bbs/raw/` + tool.Url_parser(set_id) + `/` + tool.Url_parser(set_code) + `/` + tool.Url_parser(comment_id) + `">` + tool.Get_language(db, "raw", true) + `</a></li>
+            <li><a href="/bbs/edit/` + tool.Url_parser(set_id) + `/` + tool.Url_parser(set_code) + `/` + tool.Url_parser(comment_id) + `">` + tool.Get_language(db, "edit", true) + `</a></li>
+        </ul>
+    `
+
+	if tool.Check_permission(db, "bbs_comment_manage", config.IP) {
+		comment_pinned_name := "pinned"
+		comment_set_id, comment_set_code, exists := Bbs_search_comment_location(set_id, set_code, comment_id)
+		if exists {
+			if _, pinned := tool.Get_bbs_data_value(db, comment_set_id, comment_set_code, "pinned"); pinned {
+				comment_pinned_name = "pinned_release"
+			}
+		}
+
+		data_html += `
+            <h3>` + tool.Get_language(db, "owner", true) + `</h3>
+            <ul>
+                <li><a href="/bbs/delete/` + tool.Url_parser(set_id) + `/` + tool.Url_parser(set_code) + `/` + tool.Url_parser(comment_id) + `">` + tool.Get_language(db, "delete", true) + `</a></li>
+                <li><a href="/bbs/pinned/` + tool.Url_parser(set_id) + `/` + tool.Url_parser(set_code) + `/` + tool.Url_parser(comment_id) + `">` + tool.Get_language(db, comment_pinned_name, true) + `</a></li>
+            </ul>
+        `
+		comment_blind_name := "blind"
+		blind_data, hidden := tool.Get_bbs_data_value(db, comment_set_id, comment_set_code, "blind")
+		if hidden && blind_data == "O" {
+			comment_blind_name = "blind_release"
+		}
+		data_html += "<ul><li><a href='/bbs/blind/" + tool.Url_parser(set_id) + "/" + tool.Url_parser(set_code) + "/" + tool.Url_parser(comment_id) + "'>" + tool.Get_language(db, comment_blind_name, true) + "</a></li></ul>"
+	}
+
+	return tool.Get_template(
+		db,
+		config,
+		tool.Get_language(db, "bbs_comment_tool", true),
+		data_html,
+		[]any{},
+		[][]any{
+			{"bbs/w/" + tool.Url_parser(set_id) + "/" + tool.Url_parser(set_code) + "#" + tool.Url_parser(comment_id), tool.Get_language(db, "return", true)},
+		},
+		map[string]string{},
+	)
+}

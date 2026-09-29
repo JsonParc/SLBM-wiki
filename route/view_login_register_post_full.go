@@ -1,0 +1,7 @@
+package route
+
+import "opennamu/route/tool"
+
+func View_login_register_post_full(config tool.Config, id string, password string, password_check string, captcha string, invite string) string {
+	return User_register_post(config, id, password, password_check, captcha, invite)
+}

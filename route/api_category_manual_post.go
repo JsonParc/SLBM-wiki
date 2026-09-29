@@ -1,0 +1,95 @@
+package route
+
+import (
+	"database/sql"
+	"strings"
+
+	"opennamu/route/tool"
+)
+
+func Category_manual_name(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "분류:")
+	value = strings.TrimPrefix(value, "category:")
+	if value == "" {
+		return ""
+	}
+	return "category:" + value
+}
+
+func Api_category_manual_post(config tool.Config, action string, category_name string, doc_name string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+	category_name = Category_manual_name(category_name)
+	doc_name = strings.TrimSpace(doc_name)
+	if category_name == "" || doc_name == "" {
+		return_data["response"] = "error"
+		return_data["data"] = "empty data"
+		return return_data
+	}
+	if !tool.Check_permission(db, "category_manual", config.IP) || !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
+		return_data["response"] = "require auth"
+		return return_data
+	}
+	document_data, _ := tool.Get_data_content(db, doc_name)
+	history_date := tool.Get_time()
+	history_send := tool.Get_language(db, "category", true) + " " + tool.Get_language(db, action, true) + ": " + category_name
+
+	if action == "add" {
+		value := ""
+		if tool.QueryRow_DB(
+			db,
+			"select link from back where link = ? and title = ? and type = 'cat_manual' limit 1",
+			[]any{&value},
+			doc_name,
+			category_name,
+		) {
+			return_data["response"] = "ok"
+			return return_data
+		}
+
+		if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+			if _, err := tx.Exec(
+				tool.DB_change("insert into back (link, title, type, data) values (?, ?, 'cat_manual', '')"),
+				doc_name,
+				category_name,
+			); err != nil {
+				return err
+			}
+			tool.Do_add_history(tx, doc_name, document_data, history_date, config.IP, history_send, "0", "", "")
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	} else if action == "delete" {
+		if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+			result, err := tx.Exec(
+				tool.DB_change("delete from back where link = ? and title = ? and type = 'cat_manual'"),
+				doc_name,
+				category_name,
+			)
+			if err != nil {
+				return err
+			}
+			deleted, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if deleted > 0 {
+				tool.Do_add_history(tx, doc_name, document_data, history_date, config.IP, history_send, "0", "", "")
+			}
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	} else {
+		return_data["response"] = "error"
+		return_data["data"] = "invalid data"
+		return return_data
+	}
+
+	return_data["response"] = "ok"
+	return return_data
+}

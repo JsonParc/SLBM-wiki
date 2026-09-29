@@ -1,0 +1,43 @@
+package route
+
+import "opennamu/route/tool"
+
+func View_category_manual_add(config tool.Config, add_type string, value string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	name, err := tool.Get_base64_decode(value)
+	if err != nil || name == "" {
+		return tool.Get_error_page(db, config, "not found")
+	}
+
+	category_name := ""
+	document_name := ""
+	return_name := name
+	switch add_type {
+	case "category":
+		if tool.Check_permission(db, "category_manual", config.IP) {
+			category_name = Category_manual_name(name)
+		} else {
+			return tool.Get_error_page(db, config, "auth")
+		}
+	case "document":
+		document_name = name
+		if !tool.Check_permission(db, "category_manual", config.IP) || !tool.Check_acl(db, document_name, "", "document_edit", config.IP) {
+			return tool.Get_error_page(db, config, "auth")
+		}
+	default:
+		return tool.Get_error_page(db, config, "not found")
+	}
+
+	data := Category_manual_add_form(db, config, category_name, document_name, return_name)
+	return tool.Get_template(
+		db,
+		config,
+		tool.Get_language(db, "category_manual", true),
+		data,
+		[]any{},
+		[][]any{{"w/" + tool.Url_parser(return_name), tool.Get_language(db, "return", true)}},
+		map[string]string{},
+	)
+}

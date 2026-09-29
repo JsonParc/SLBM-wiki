@@ -1,0 +1,97 @@
+package route
+
+import (
+	"strconv"
+
+	"opennamu/route/tool"
+)
+
+func View_bbs_search_comment(config tool.Config, set_id string, keyword string, page string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if set_id == "" && !tool.Check_permission(db, "bbs_main_view", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	if set_id != "" && !tool.Check_acl(db, set_id, "", "bbs_view", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+
+	page_int := tool.Str_to_int(page)
+	if page_int < 1 {
+		page_int = 1
+	}
+
+	bbs_name := ""
+	title := tool.Get_language(db, "comment", true) + " " + tool.Get_language(db, "search", true)
+	search_path := "/bbs/search_comment"
+	title_search_path := "/bbs/search"
+	data_search_path := "/bbs/search_data"
+	bbs_id_to_name := map[string]string{}
+
+	if set_id != "" {
+		bbs_name_data := Api_bbs_num_to_name(db, set_id)
+		bbs_name, _ = bbs_name_data["data"].(string)
+		if bbs_name == "" {
+			return tool.Get_redirect("/bbs/main")
+		}
+
+		title = bbs_name
+		search_path += "/" + tool.Url_parser(set_id)
+		title_search_path += "/" + tool.Url_parser(set_id)
+		data_search_path += "/" + tool.Url_parser(set_id)
+		bbs_id_to_name[set_id] = bbs_name
+	} else {
+		for name, id := range Bbs_list(db) {
+			if tool.Check_acl(db, id, "", "bbs_view", config.IP) {
+				bbs_id_to_name[id] = name
+			}
+		}
+	}
+
+	data_html := `<form method="post" action="` + search_path + `">
+        <div>
+            <label for="bbs_comment_search_keyword">` + tool.Get_language(db, "search", true) + `</label>
+            <input id="bbs_comment_search_keyword" class="__ON_INPUT__" name="keyword" value="` + tool.HTML_escape(keyword) + `">
+        </div>
+        <hr class="main_hr">
+        <div>
+            <button class="__ON_BUTTON__" type="submit">` + tool.Get_language(db, "search", true) + `</button>
+        </div>
+    </form>`
+	data_html += `<div>(<a href="` + title_search_path + `">` + tool.Get_language(db, "search", true) + `</a>)</div><hr class="main_hr">`
+	data_html += `<div>(<a href="` + data_search_path + `">` + tool.Get_language(db, "bbs_search_data", true) + `</a>)</div><hr class="main_hr">`
+
+	if keyword != "" {
+		data_api := Api_bbs_search_comment(config, keyword, set_id, strconv.Itoa(page_int))
+		data_list, _ := data_api["data"].([]map[string]string)
+		data_html += Get_bbs_list_ui(db, config, data_list, bbs_id_to_name)
+
+		has_next, _ := data_api["has_next"].(bool)
+		if len(data_list) == 0 {
+			data_html += `<div>` + tool.Get_language(db, "search_no_result", true) + `</div><hr class="main_hr">`
+		}
+		page_url := "/bbs/search_comment_page/{}/" + tool.Url_parser(keyword)
+		if set_id != "" {
+			page_url = "/bbs/search_comment_board_page/" + tool.Url_parser(set_id) + "/{}" + "/" + tool.Url_parser(keyword)
+		}
+		data_html += tool.Get_page_control(db, page_int, len(data_list), 50, page_url, has_next)
+	}
+
+	return_menu := "bbs/main"
+	if set_id != "" {
+		return_menu = "bbs/in/" + tool.Url_parser(set_id)
+	}
+
+	return tool.Get_template(
+		db,
+		config,
+		title,
+		data_html,
+		[]any{},
+		[][]any{
+			{return_menu, tool.Get_language(db, "return", true)},
+		},
+		map[string]string{},
+	)
+}

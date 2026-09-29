@@ -1,0 +1,21 @@
+package route
+
+import (
+	"net/url"
+
+	"opennamu/route/tool"
+)
+
+func View_history_add_safe(config tool.Config, doc_name string, values url.Values) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+	if values == nil && !tool.Check_permission(db, "history_manage", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	if values != nil {
+		api_data := Api_history_add_post(config, doc_name, values.Get("content"), values.Get("get_ip"), values.Get("send"))
+		return tool.Api_post_redirect(db, config, api_data, "/history/"+tool.Url_parser(doc_name))
+	}
+	body := `<form method="post"><label for="history_send">` + tool.Get_language(db, "send", true) + `</label><input id="history_send" name="send"><hr class="main_hr"><label for="history_ip">` + tool.Get_language(db, "ip", true) + `</label><input id="history_ip" name="get_ip"><hr class="main_hr"><div><label for="history_content">` + tool.Get_language(db, "content", true) + `</label></div><textarea id="history_content" name="content" class="opennamu_textarea_500"></textarea><hr class="main_hr"><button type="submit">` + tool.Get_language(db, "add", true) + `</button></form>`
+	return Document_safe_page(db, config, tool.Get_language(db, "history_add", true), body)
+}

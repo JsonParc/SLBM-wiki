@@ -1,0 +1,84 @@
+package route
+
+import (
+	"opennamu/route/tool"
+)
+
+func View_record_page(config tool.Config, user_name string, record_type string, page string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if user_name == "" {
+		user_name = config.IP
+	}
+	if user_name != config.IP && !tool.Check_permission(db, "hidel", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	if record_type == "" {
+		record_type = "edit"
+	}
+	if record_type == "topic" {
+		return tool.Get_redirect("/record/bbs_comment/" + tool.Url_parser(user_name) + "/" + tool.Url_parser(page))
+	}
+
+	page_num := tool.Str_to_int(page)
+	if page_num < 1 {
+		page_num = 1
+	}
+	offset := (page_num - 1) * 50
+	data_html := ""
+	count := 0
+
+	rows := tool.Get_history_record_rows(db, user_name, record_type, offset, true)
+
+	data_list := [][]string{}
+	ip_cache := map[string][]string{}
+	can_view_hidden := tool.Check_permission(db, "hidel", config.IP)
+	for rows.Next() {
+		id, title, date, ip, send, leng, hide, type_data := "", "", "", "", "", "", "", ""
+		if rows.Scan(&id, &title, &date, &ip, &send, &leng, &hide, &type_data) != nil {
+			continue
+		}
+		if hide != "" && !can_view_hidden {
+			data_list = append(data_list, []string{"", "", "", "", "", "", hide, "", ""})
+			continue
+		}
+
+		ip_data, ok := ip_cache[ip]
+		if !ok {
+			ip_pre := tool.IP_preprocess(db, ip, config.IP)
+			ip_data = []string{"", tool.IP_parser(db, ip, config.IP)}
+			if len(ip_pre) > 0 {
+				ip_data[0] = ip_pre[0]
+			}
+			ip_cache[ip] = ip_data
+		}
+		data_list = append(data_list, []string{id, title, date, ip_data[0], send, leng, hide, ip_data[1], type_data})
+	}
+	rows.Close()
+
+	data_html, _ = Get_ui_history(db, data_list)
+	count = len(data_list)
+	data_html += tool.Get_page_control(db, page_num, count, 50, "/record/{}/"+tool.Url_parser(record_type)+"/"+tool.Url_parser(user_name))
+
+	menu_html := ""
+	for _, option := range []string{"normal", "edit", "move", "delete", "revert", "r1", "file", "category"} {
+		menu_html += `<a href="/record/1/` + option + `/` + tool.Url_parser(user_name) + `">(` + tool.Get_language(db, option, true) + `)</a> `
+	}
+	data_html = menu_html + data_html
+
+	menu := [][]any{{"user/" + tool.Url_parser(user_name), tool.Get_language(db, "user_tool", true)}}
+	if tool.Check_permission(db, "record_manage", config.IP) {
+		menu = append(menu, []any{"record/reset/" + tool.Url_parser(user_name), tool.Get_language(db, "record_reset", true)})
+	}
+
+	return tool.Get_template(
+		db,
+		config,
+		user_name,
+		data_html,
+		[]any{"(" + tool.Get_language(db, "edit_record", true) + ")"},
+		menu,
+		map[string]string{},
+	)
+}

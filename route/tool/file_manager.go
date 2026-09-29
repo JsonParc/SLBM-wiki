@@ -1,0 +1,150 @@
+package tool
+
+import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"io"
+	"path/filepath"
+	"strings"
+
+	"github.com/dlclark/regexp2"
+)
+
+var file_document_extensions = []string{"pdf", "docx"}
+var file_audio_extensions = []string{"mp3", "wav", "flac", "aac", "m4a", "ogg", "oga", "opus", "amr", "weba"}
+var file_video_extensions = []string{"mp4", "m4v", "webm", "mkv", "mov", "avi", "mpeg", "mpg", "ts", "3gp", "3g2"}
+
+func Is_audio_extension(extension string) bool {
+	extension = strings.ToLower(strings.TrimPrefix(extension, "."))
+	for _, audio_extension := range file_audio_extensions {
+		if extension == audio_extension {
+			return true
+		}
+	}
+
+	return false
+}
+
+func Is_video_extension(extension string) bool {
+	extension = strings.ToLower(strings.TrimPrefix(extension, "."))
+	for _, video_extension := range file_video_extensions {
+		if extension == video_extension {
+			return true
+		}
+	}
+
+	return false
+}
+
+func Get_file_max_size(db *sql.DB) int {
+	data := "0"
+
+	QueryRow_DB(
+		db,
+		"select data from other where name = 'upload'",
+		[]any{&data},
+	)
+
+	file_max_size := Str_to_int(data)
+
+	return file_max_size
+}
+
+func Get_file_max_size_by_extension(db *sql.DB, extension string) int {
+	extension = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(extension), "."))
+	data := ""
+
+	QueryRow_DB(
+		db,
+		"select plus from html_filter where kind = 'extension' and html = ? limit 1",
+		[]any{&data},
+		extension,
+	)
+
+	file_max_size := Str_to_int(data)
+	global_max_size := Get_file_max_size(db)
+	if global_max_size <= 0 {
+		global_max_size = 2
+	}
+	if file_max_size <= 0 || file_max_size > global_max_size {
+		return global_max_size
+	}
+
+	return file_max_size
+}
+
+func Get_file_main_dir(db *sql.DB) string {
+	data := ""
+
+	QueryRow_DB(
+		db,
+		"select data from other where name = 'image_where'",
+		[]any{&data},
+	)
+
+	if data == "" {
+		data = filepath.Join("data", "images")
+	} else {
+		data = filepath.Clean(data)
+	}
+
+	return data
+}
+
+func Get_ext_allow_list(db *sql.DB) map[string]bool {
+	rows := Query_DB(db, "select html from html_filter where kind = 'extension'")
+	defer rows.Close()
+
+	data_list := map[string]bool{}
+
+	for rows.Next() {
+		data := ""
+
+		err := rows.Scan(&data)
+		if err != nil {
+			panic(err)
+		}
+
+		data = strings.ToLower(data)
+		data = strings.TrimPrefix(data, ".")
+
+		data_list[data] = true
+	}
+
+	return data_list
+}
+
+func Get_file_name_unallow_check(db *sql.DB, file_name string) bool {
+	rows := Query_DB(db, "select html from html_filter where kind = 'file_name'")
+	defer rows.Close()
+
+	for rows.Next() {
+		data := ""
+
+		err := rows.Scan(&data)
+		if err != nil {
+			panic(err)
+		}
+
+		r, err := regexp2.Compile(data, 0)
+		if err != nil {
+			continue
+		}
+
+		m, err := r.MatchString(file_name)
+		if err == nil && m {
+			return true
+		}
+	}
+
+	return false
+}
+
+func File_name_to_dir(file_name string, file_ext string) string {
+	h := sha256.New224()
+	io.WriteString(h, file_name)
+	hash_hex := hex.EncodeToString(h.Sum(nil))
+
+	return hash_hex + "." + file_ext
+}

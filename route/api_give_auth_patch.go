@@ -1,0 +1,182 @@
+package route
+
+import (
+	"database/sql"
+	"net"
+	"strings"
+	"time"
+
+	"opennamu/route/tool"
+
+	"github.com/dlclark/regexp2"
+)
+
+func Api_give_auth_patch(config tool.Config, auth string, change_auth string, user_name string, end_date string, end_period string, target_type string, reason string, release bool) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	new_data := make(map[string]any)
+
+	end_date = strings.TrimSpace(end_date)
+	if end_date == "0" {
+		end_date = ""
+	}
+	if !release && end_period != "" {
+		period_end_date, ok := Auth_period_end_date(end_period)
+		if !ok {
+			new_data["response"] = "error"
+			new_data["data"] = "invalid end period"
+			return new_data
+		}
+		end_date = period_end_date
+	}
+	if !release && end_date == "" {
+		end_date = tool.Get_auth_default_end_date()
+	}
+	if end_date != "" {
+		end_time, err := time.Parse("2006-01-02", end_date)
+		if err != nil {
+			end_time, err = time.Parse("2006-01-02 15:04:05", end_date)
+		}
+		if err != nil {
+			new_data["response"] = "error"
+			new_data["data"] = "invalid end date"
+			return new_data
+		}
+		end_date = end_time.Format("2006-01-02 15:04:05")
+	}
+
+	ip := config.IP
+	before_auth := auth
+	band := ""
+	switch target_type {
+	case "", "normal":
+		target_type = "normal"
+	case "regex":
+		band = "regex"
+		if user_name != "" {
+			if _, err := regexp2.Compile(user_name, 0); err != nil {
+				new_data["response"] = "error"
+				new_data["data"] = "invalid regex"
+				return new_data
+			}
+		}
+	case "cidr":
+		band = "cidr"
+		if user_name != "" {
+			if _, _, err := net.ParseCIDR(user_name); err != nil {
+				new_data["response"] = "error"
+				new_data["data"] = "invalid cidr"
+				return new_data
+			}
+		}
+	case "private":
+		band = "private"
+		if !tool.Check_permission(db, "auth_private_give", ip) {
+			new_data["response"] = "require auth"
+			return new_data
+		}
+	default:
+		new_data["response"] = "error"
+		new_data["data"] = "invalid target type"
+		return new_data
+	}
+
+	required_auth := "give"
+	if band == "regex" || band == "cidr" {
+		required_auth = "give_range"
+	}
+	if band == "private" {
+		required_auth = "auth_private_give"
+	}
+	if !tool.Check_permission(db, required_auth, ip) {
+		new_data["response"] = "require auth"
+		return new_data
+	}
+
+	if user_name != "" {
+		before_auth = tool.Get_auth_target_group(db, user_name, target_type)
+	}
+
+	can_change := false
+	if release {
+		can_change = user_name != "" && tool.Auth_can_change_auth(db, ip, before_auth, "ip")
+	} else {
+		can_change = tool.Auth_can_change_auth(db, ip, before_auth, change_auth)
+	}
+	if !can_change {
+		new_data["response"] = "require auth"
+		return new_data
+	}
+
+	action := change_auth
+	if release {
+		action = "release"
+	}
+
+	if user_name != "" {
+		if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+			tool.Do_auth_insert(tx, user_name, end_date, reason, change_auth, ip, band, release)
+			tool.Do_insert_auth_history(tx, ip, "give_auth ("+user_name+") -> "+action)
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	} else {
+		type auth_target_data struct {
+			user_name string
+			end_date  string
+		}
+		target_list := []auth_target_data{}
+		if auth != change_auth {
+			rows := tool.Query_DB(
+				db,
+				"select a.id, coalesce((select e.data from user_set as e where e.id = a.id and e.name = 'acl_end' limit 1), '') from user_set as a where a.name = 'acl' and a.data = ?",
+				auth,
+			)
+			for rows.Next() {
+				data := auth_target_data{}
+				if err := rows.Scan(&data.user_name, &data.end_date); err == nil {
+					target_list = append(target_list, data)
+				}
+			}
+			rows.Close()
+		}
+
+		if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+			for _, data := range target_list {
+				tool.Do_auth_insert(tx, data.user_name, data.end_date, "", change_auth, ip, "", false)
+			}
+			tool.Do_insert_auth_history(tx, ip, "give_auth ("+auth+") -> "+change_auth)
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+	}
+
+	new_data["response"] = "ok"
+	return new_data
+}
+
+func Auth_period_end_date(period string) (string, bool) {
+	now := time.Now()
+	switch period {
+	case "1_day":
+		now = now.AddDate(0, 0, 1)
+	case "3_day":
+		now = now.AddDate(0, 0, 3)
+	case "7_day":
+		now = now.AddDate(0, 0, 7)
+	case "30_day":
+		now = now.AddDate(0, 0, 30)
+	case "60_day":
+		now = now.AddDate(0, 0, 60)
+	case "1_year":
+		now = now.AddDate(1, 0, 0)
+	case "100_year":
+		now = now.AddDate(100, 0, 0)
+	default:
+		return "", false
+	}
+	return now.Format("2006-01-02 15:04:05"), true
+}

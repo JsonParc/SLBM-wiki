@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: slbm-wiki
+    runtime: go
+    buildCommand: go build -o main .
+    startCommand: ./main $PORT
+    healthCheckPath: /
+    disk:
+      name: slbm-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

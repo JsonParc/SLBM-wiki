@@ -1,0 +1,210 @@
+package route
+
+import (
+	"opennamu/route/tool"
+	"strings"
+)
+
+func Api_bbs_w_edit_view(config tool.Config, set_id string, set_code string, comment_code string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+	if Bbs_is_special_board(set_id) && set_id != thread_bbs_id {
+		return_data["response"] = "not allowed"
+		return return_data
+	}
+
+	bbs_name := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_set where set_id = ? and set_name = 'bbs_name'",
+		[]any{&bbs_name},
+		set_id,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "bbs"
+
+		return return_data
+	}
+
+	if !Bbs_post_blind_allowed(db, set_id, set_code, config.IP, nil) {
+		return_data["response"] = "require auth"
+		return return_data
+	}
+
+	edit_acl := "bbs_edit"
+	if comment_code != "" {
+		edit_acl = "bbs_comment"
+	}
+	if !tool.Check_acl(db, set_id, "", edit_acl, config.IP) {
+		return_data["response"] = "require auth"
+
+		return return_data
+	}
+	if set_id == "0" && set_code == "" && comment_code == "" {
+		return_data["response"] = "not exist"
+		return_data["data"] = "bbs"
+
+		return return_data
+	}
+
+	data := map[string]string{
+		"title":  "",
+		"data":   "",
+		"prefix": "",
+		"tags":   "",
+	}
+
+	if comment_code != "" {
+		comment_code_split := strings.Split(comment_code, "-")
+		comment_set_id := set_id + "-" + set_code
+		comment_set_code := ""
+
+		if len(comment_code_split) > 0 {
+			comment_set_code = comment_code_split[len(comment_code_split)-1]
+			if len(comment_code_split) > 1 {
+				comment_set_id += "-" + strings.Join(comment_code_split[:len(comment_code_split)-1], "-")
+			}
+		}
+
+		if comment_set_code == "" {
+			return_data["response"] = "not exist"
+			return_data["data"] = "comment"
+
+			return return_data
+		}
+
+		comment := ""
+		if !tool.QueryRow_DB(
+			db,
+			"select set_data from bbs_data where set_name = 'comment' and set_id = ? and set_code = ?",
+			[]any{&comment},
+			comment_set_id,
+			comment_set_code,
+		) {
+			return_data["response"] = "not exist"
+			return_data["data"] = "comment"
+
+			return return_data
+		}
+
+		comment_user_id := ""
+		if !tool.QueryRow_DB(
+			db,
+			"select set_data from bbs_data where set_name = 'comment_user_id' and set_id = ? and set_code = ?",
+			[]any{&comment_user_id},
+			comment_set_id,
+			comment_set_code,
+		) {
+			return_data["response"] = "not exist"
+			return_data["data"] = "comment"
+
+			return return_data
+		}
+
+		comment_manage := tool.Check_permission(db, "bbs_comment_manage", config.IP)
+		blind := ""
+		tool.QueryRow_DB(
+			db,
+			"select set_data from bbs_data where set_name = 'blind' and set_id = ? and set_code = ?",
+			[]any{&blind},
+			comment_set_id,
+			comment_set_code,
+		)
+		if blind == "O" && !comment_manage {
+			return_data["response"] = "require auth"
+			return return_data
+		}
+		if comment_user_id != config.IP && !comment_manage {
+			return_data["response"] = "require auth"
+
+			return return_data
+		}
+
+		data["data"] = comment
+		return_data["response"] = "ok"
+		return_data["data"] = data
+
+		return return_data
+	}
+
+	if set_code == "" {
+		return_data["response"] = "ok"
+		return_data["data"] = data
+
+		return return_data
+	}
+
+	title := ""
+	content := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'title' and set_id = ? and set_code = ?",
+		[]any{&title},
+		set_id,
+		set_code,
+	) || !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'data' and set_id = ? and set_code = ?",
+		[]any{&content},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+
+		return return_data
+	}
+
+	user_id := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'user_id' and set_id = ? and set_code = ?",
+		[]any{&user_id},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+
+		return return_data
+	}
+
+	if user_id != config.IP && !tool.Check_permission(db, "bbs_post_manage", config.IP) {
+		return_data["response"] = "require auth"
+
+		return return_data
+	}
+
+	data["title"] = title
+	data["data"] = content
+	prefix := ""
+	tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'prefix' and set_id = ? and set_code = ?",
+		[]any{&prefix},
+		set_id,
+		set_code,
+	)
+	data["prefix"] = prefix
+	rows := tool.Query_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'tag' and set_id = ? and set_code = ?",
+		set_id,
+		set_code,
+	)
+	tag_list := []string{}
+	for rows.Next() {
+		var tag string
+		if rows.Scan(&tag) == nil {
+			tag_list = append(tag_list, tag)
+		}
+	}
+	rows.Close()
+	data["tags"] = strings.Join(tag_list, ", ")
+	return_data["response"] = "ok"
+	return_data["data"] = data
+
+	return return_data
+}

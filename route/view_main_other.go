@@ -1,0 +1,91 @@
+package route
+
+import (
+	"opennamu/route/tool"
+)
+
+func View_main_other(config tool.Config) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	ai_link := ""
+	if tool.Check_permission(db, "ai_use", config.IP) {
+		ai_link = `<li><a href="/ai">` + tool.Get_language(db, "local_ai", true) + `</a></li>`
+	}
+
+	out := tool.Get_template(
+		db,
+		config,
+		tool.Get_language(db, "other_tool", true),
+		`<h2>`+tool.Get_language(db, "user_tool", true)+`</h2>
+        <ul>
+            <li><a href="/manager/6">`+tool.Get_language(db, "user_tool", true)+`</a></li>
+        </ul>
+        <h2>`+tool.Get_language(db, "list", true)+`</h2>
+        <h3>`+tool.Get_language(db, "admin", true)+`</h3>
+        <ul>               
+            <li><a href="/list/admin">`+tool.Get_language(db, "admin_list", true)+`</a></li>
+            <li><a href="/list/admin/auth_use">`+tool.Get_language(db, "authority_use_list", true)+`</a></li>
+        </ul>
+        <h3>`+tool.Get_language(db, "thread_bbs", true)+`</h3>
+        <ul>
+            <li><a href="/bbs/in/-1">`+tool.Get_language(db, "thread_bbs", true)+`</a></li>
+        </ul>
+        <h3>`+tool.Get_language(db, "document", true)+`</h3>
+        <ul>
+            <li><a href="/recent_change">`+tool.Get_language(db, "recent_change", true)+`</a></li>
+            <li><a href="/list/random">`+tool.Get_language(db, "random_list", true)+`</a></li>
+            <li><a href="/list/document/all">`+tool.Get_language(db, "all_document_list", true)+`</a></li>
+            <li><a href="/list/document/acl">`+tool.Get_language(db, "acl_document_list", true)+`</a></li>
+            <li><a href="/list/document/need">`+tool.Get_language(db, "need_document", true)+`</a></li>
+            <li><a href="/list/document/manual_category">`+tool.Get_language(db, "no_data_manual_category_list", true)+`</a></li>
+            <li><a href="/list/category/need">`+tool.Get_language(db, "need_category", true)+`</a></li>
+            <li><a href="/list/document/long">`+tool.Get_language(db, "long_page", true)+`</a></li>
+            <li><a href="/list/document/short">`+tool.Get_language(db, "short_page", true)+`</a></li>
+            <li><a href="/list/document/old">`+tool.Get_language(db, "old_page", true)+`</a></li>
+            <li><a href="/list/document/new">`+tool.Get_language(db, "new_page", true)+`</a></li>
+            <li><a href="/list/document/no_link">`+tool.Get_language(db, "no_link_document_list", true)+`</a></li>
+            <li><a href="/list/document/unlinked">`+tool.Get_language(db, "unlinked_document_list", true)+`</a></li>
+            <li><a href="/list/document/redirect">`+tool.Get_language(db, "redirect_problem_list", true)+`</a></li>
+            <li><a href="/list/document/redirect/not_exist">`+tool.Get_language(db, "redirect_not_exist_list", true)+`</a></li>
+            <li><a href="/list/document/no_category">`+tool.Get_language(db, "no_category_document_list", true)+`</a></li>
+            <li><a href="/list/document/category/markup">`+tool.Get_language(db, "category_markup_list", true)+`</a></li>
+            <li><a href="/list/category/no_link">`+tool.Get_language(db, "unused_category", true)+`</a></li>
+        </ul>
+        <h3>`+tool.Get_language(db, "statistics", true)+`</h3>
+        <ul>
+            <li><a href="/list/document/view">`+tool.Get_language(db, "page_view_sort", true)+`</a></li>
+            <li><a href="/list/document/view/month">`+tool.Get_language(db, "page_view_month", true)+`</a></li>
+            <li><a href="/list/document/view/day">`+tool.Get_language(db, "page_view_day", true)+`</a></li>
+            <li><a href="/list/document/view/not_exist">`+tool.Get_language(db, "page_view_not_exist", true)+`</a></li>
+            <li><a href="/list/contributor">`+tool.Get_language(db, "monthly_top_contributor", true)+`</a></li>
+            <li><a href="/bbs/contributor">`+tool.Get_language(db, "monthly_bbs_contributor", true)+`</a></li>
+            <li><a href="/statistics">`+tool.Get_language(db, "statistics", true)+`</a></li>
+        </ul>
+        <h3>`+tool.Get_language(db, "user", true)+`</h3>
+        <ul>
+            <li><a href="/auth/give_list">`+tool.Get_language(db, "auth_give_list", true)+`</a></li>
+            <li><a href="/list/user">`+tool.Get_language(db, "member_list", true)+`</a></li>
+        </ul>
+        <h3>`+tool.Get_language(db, "other", true)+`</h3>
+        <ul>
+            <li><a href="/list/image">`+tool.Get_language(db, "image_file_list", true)+`</a></li>
+            <li><a href="/vote">`+tool.Get_language(db, "vote_list", true)+`</a></li>
+            <li><a href="/bbs/main">`+tool.Get_language(db, "bbs_main", true)+`</a></li>
+        </ul>
+        <h2>`+tool.Get_language(db, "other", true)+`</h2>
+        <ul>`+ai_link+`
+            <li><a href="/upload">`+tool.Get_language(db, "upload", true)+`</a></li>
+            <li><a href="/manager/10">`+tool.Get_language(db, "search", true)+`</a></li>
+        </ul>
+        <h2>`+tool.Get_language(db, "admin", true)+`</h2>
+        <ul>
+            <li><a href="/manager/1">`+tool.Get_language(db, "admin_tool", true)+`</a></li>
+        </ul>`,
+		[]any{},
+		[][]any{},
+		map[string]string{},
+	)
+
+	return out
+}

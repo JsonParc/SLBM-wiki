@@ -1,0 +1,148 @@
+package main
+
+import (
+	"crypto/md5"
+	_ "embed"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"runtime/debug"
+	"strconv"
+	"time"
+
+	"opennamu/route"
+	"opennamu/route/tool"
+
+	"github.com/flosch/pongo2/v6"
+	"github.com/gin-gonic/gin"
+)
+
+var dev_mode = false
+
+//go:embed version.json
+var builtin_version_json []byte
+
+func Error_handler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("%v", r)
+				}
+
+				stack_trace := debug.Stack()
+				log.Printf("Panic recovered: %v\n%s", err, stack_trace)
+
+				if dev_mode {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+						"response": "error",
+						"error":    err.Error(),
+						"stack":    string(stack_trace),
+					})
+				} else {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+						"response": "error",
+						"error":    "Internal Server Error",
+					})
+				}
+			}
+		}()
+
+		c.Next()
+	}
+}
+
+func Pongo_init() {
+	pongo2.RegisterFilter("md5_replace", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		h := md5.Sum([]byte(in.String()))
+
+		return pongo2.AsValue(hex.EncodeToString(h[:])), nil
+	})
+
+	pongo2.RegisterFilter("load_lang", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		db := tool.DB_connect()
+		defer tool.DB_close(db)
+
+		return pongo2.AsValue(tool.Get_language(db, in.String(), false)), nil
+	})
+
+	pongo2.RegisterFilter("cut_100", func(in *pongo2.Value, param *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		data := in.String()
+		data = tool.Get_slice(data, 0, 100)
+
+		return pongo2.AsValue(data), nil
+	})
+}
+
+func Wait_startup_delay() {
+	delay_text := os.Getenv("NAMU_START_DELAY_MS")
+	os.Unsetenv("NAMU_START_DELAY_MS")
+
+	delay, err := strconv.Atoi(delay_text)
+	if err != nil || delay <= 0 {
+		return
+	}
+	if delay > 10000 {
+		delay = 10000
+	}
+
+	time.Sleep(time.Duration(delay) * time.Millisecond)
+}
+
+func main() {
+	tool.Set_builtin_version_data(builtin_version_json)
+
+	if len(os.Args) > 1 && os.Args[1] == "--opennamu-update" {
+		os.Exit(route.Run_server_update(os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "em" {
+		os.Exit(route.Run_emergency_tool(os.Args[2:]))
+	}
+
+	Wait_startup_delay()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	port := "3000"
+	host := "0.0.0.0"
+	for _, arg := range os.Args[1:] {
+		if arg == "--localhost" {
+			host = "127.0.0.1"
+		} else if arg == "dev" {
+			dev_mode = true
+		} else if port == "3000" {
+			port = arg
+		}
+	}
+
+	var r *gin.Engine
+	if dev_mode {
+		r = gin.Default()
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+		r = gin.New()
+	}
+
+	db_version := tool.Main_init()
+	if err := route.Migrate_topic_to_bbs(db_version); err != nil {
+		log.Printf("[DB WARNING] topic BBS migration failed: %v", err)
+		tool.Set_db_version(db_version)
+	}
+	tool.Search_bbs_index_start()
+
+	r.Use(Error_handler())
+	r.Use(tool.Session_middleware())
+	r.Use(Site_view_middleware())
+	r.Use(Wiki_access_middleware())
+	Pongo_init()
+
+	Register_routes(r)
+	route.Start_auto_server_update()
+
+	log.Default().Println("Run in http://" + host + ":" + port)
+	if err := r.Run(host + ":" + port); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}

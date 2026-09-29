@@ -1,0 +1,54 @@
+package route
+
+import (
+	"database/sql"
+
+	"opennamu/route/tool"
+)
+
+func Api_bbs_w_comment_close(config tool.Config, set_id string, set_code string, closed bool) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+
+	title := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'title' and set_id = ? and set_code = ?",
+		[]any{&title},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+		return return_data
+	}
+
+	if !tool.Check_permission(db, "bbs_comment_manage", config.IP) {
+		return_data["response"] = "require auth"
+		return return_data
+	}
+	if set_id == thread_bbs_id || (Bbs_is_special_board(set_id) && set_id != "0") {
+		return_data["response"] = "not allowed"
+		return return_data
+	}
+
+	if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(tool.DB_change("delete from bbs_data where set_name = 'comment_close' and set_id = ? and set_code = ?"), set_id, set_code); err != nil {
+			return err
+		}
+		if closed {
+			if _, err := tx.Exec(tool.DB_change("insert into bbs_data (set_name, set_code, set_id, set_data) values ('comment_close', ?, ?, '1')"), set_code, set_id); err != nil {
+				return err
+			}
+		}
+		Bbs_post_last_activity_update(tx, set_id, set_code, tool.Get_time())
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+
+	return_data["response"] = "ok"
+	return return_data
+}

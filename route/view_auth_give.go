@@ -1,0 +1,165 @@
+package route
+
+import (
+	"database/sql"
+	"net/url"
+	"sort"
+	"strings"
+
+	"opennamu/route/tool"
+)
+
+func Auth_groups(db *sql.DB) []string {
+	groups := tool.List_auth(db)
+	sort.Strings(groups)
+	return groups
+}
+
+func Auth_target_type_select(db *sql.DB, target_type string, owner bool) string {
+	data := `<select id="target_type" name="target_type">`
+	for _, target := range []string{"normal", "regex", "cidr"} {
+		selected := ""
+		if target == target_type {
+			selected = ` selected`
+		}
+		data += `<option value="` + target + `"` + selected + `>` + tool.Get_language(db, target, true) + `</option>`
+	}
+	if owner {
+		selected := ""
+		if target_type == "private" {
+			selected = ` selected`
+		}
+		data += `<option value="private"` + selected + `>` + tool.Get_language(db, "private", true) + `</option>`
+	}
+	return data + `</select>`
+}
+
+func Auth_period_select(db *sql.DB) string {
+	periods := []string{"1_day", "3_day", "7_day", "30_day", "60_day", "1_year", "100_year"}
+	data := `<select id="end_period" name="end_period"><option value="">` + tool.Get_language(db, "direct_input", true) + `</option>`
+	for _, period := range periods {
+		data += `<option value="` + period + `">` + tool.Get_language(db, period, true) + `</option>`
+	}
+	return data + `</select>`
+}
+
+func View_auth_give(config tool.Config, mode string, user_name string, target_type string, values url.Values) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if target_type == "" {
+		target_type = "normal"
+	}
+	required_auth := "give"
+	if target_type == "regex" || target_type == "cidr" {
+		required_auth = "give_range"
+	}
+	if target_type == "private" {
+		required_auth = "auth_private_give"
+	}
+	if values == nil && !tool.Check_permission(db, required_auth, config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+
+	groups := Auth_groups(db)
+	if len(groups) == 0 {
+		return tool.Get_error_page(db, config, "error")
+	}
+
+	if values != nil {
+		if mode != "total" && values.Get("target_type") != "" {
+			target_type = values.Get("target_type")
+		}
+		change_auth := values.Get("change_auth")
+		release := values.Get("action") == "release"
+		if !release && !tool.Arr_in_str(groups, change_auth) {
+			return tool.Get_error_page(db, config, "error")
+		}
+
+		if mode == "total" {
+			result := Api_give_auth_patch(config, values.Get("auth"), change_auth, "", "", "", "normal", "", false)
+			if result["response"] != "ok" {
+				return tool.Get_error_page(db, config, "auth")
+			}
+		} else {
+			names := []string{user_name}
+			if user_name == "" {
+				names = strings.Split(strings.ReplaceAll(values.Get("user_name"), "\r", ""), "\n")
+			}
+			for _, name := range names {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				result := Api_give_auth_patch(config, "", change_auth, name, values.Get("end_date"), values.Get("end_period"), target_type, values.Get("why"), release)
+				if result["response"] != "ok" {
+					return tool.Get_error_page(db, config, "auth")
+				}
+			}
+		}
+
+		if mode == "total" {
+			return tool.Get_redirect("/auth/give_total")
+		}
+		if user_name != "" {
+			target_path := tool.Url_parser(user_name)
+			if target_type != "normal" {
+				target_path = target_type + "/" + target_path
+			}
+			return tool.Get_redirect("/auth/give/" + target_path)
+		}
+		return tool.Get_redirect("/auth/give")
+	}
+
+	data := `<form method="post">`
+	if mode != "total" {
+		data += `<p>` + tool.Get_language(db, "auth_give_help", true) + `</p>`
+	}
+	if mode == "total" {
+		data += `<label for="auth">` + tool.Get_language(db, "admin_group", true) + `</label><hr class="main_hr">`
+		data += tool.Build_select("auth", groups, "", "") + `<hr class="main_hr">`
+	} else if user_name == "" {
+		data += `<label for="user_name">` + tool.Get_language(db, "name_or_ip_or_regex_or_cidr_multiple", true) + `</label><hr class="main_hr"><textarea id="user_name" class="opennamu_textarea_100" name="user_name"></textarea><hr class="main_hr">`
+	} else {
+		data += `<div id="opennamu_get_user_info">` + tool.HTML_escape(user_name) + `</div><hr class="main_hr">`
+	}
+
+	selected := ""
+	end_date := ""
+	if user_name != "" {
+		selected = tool.Get_auth_target_group(db, user_name, target_type)
+		if target_type == "normal" {
+			end_date = tool.Get_user_set_data(db, user_name, "acl_end")
+		} else {
+			end_date = tool.Get_rb_end(db, user_name, target_type)
+		}
+		if len(end_date) > 10 {
+			end_date = end_date[:10]
+		}
+	}
+	if mode != "total" && (end_date == "" || end_date == "0") {
+		end_date = tool.Get_auth_default_end_date()[:10]
+	}
+
+	if mode != "total" {
+		owner := tool.Check_permission(db, "owner", config.IP)
+		data += `<label for="target_type">` + tool.Get_language(db, "target_type", true) + `</label><hr class="main_hr">` + Auth_target_type_select(db, target_type, owner) + `<hr class="main_hr">`
+	}
+	data += `<label for="change_auth">` + tool.Get_language(db, "admin_group", true) + `</label><hr class="main_hr">` + tool.Build_select("change_auth", groups, selected, "")
+	if mode != "total" {
+		data += `<hr class="main_hr"><label for="end_period">` + tool.Get_language(db, "period", true) + `</label><hr class="main_hr">` + Auth_period_select(db)
+		data += `<hr class="main_hr"><label for="end_date">` + tool.Get_language(db, "date", true) + `</label><hr class="main_hr"><input id="end_date" type="date" name="end_date" value="` + tool.HTML_escape(end_date) + `">`
+		data += `<hr class="main_hr"><label for="why">` + tool.Get_language(db, "why", true) + `</label><hr class="main_hr"><input id="why" name="why">`
+		data += `<hr class="main_hr"><label for="action">` + tool.Get_language(db, "auth_action", true) + `</label><hr class="main_hr"><select id="action" name="action"><option value="give">` + tool.Get_language(db, "authorize", true) + `</option><option value="release">` + tool.Get_language(db, "auth_release", true) + `</option></select>`
+	}
+	data += `<hr class="main_hr"><button type="submit">` + tool.Get_language(db, "send", true) + `</button></form>`
+
+	title := tool.Get_language(db, "authorize", true)
+	if mode == "total" {
+		title = tool.Get_language(db, "auth_to_auth", true)
+	} else if user_name == "" {
+		title = tool.Get_language(db, "multiple_authorize", true)
+	}
+
+	return tool.Get_template(db, config, title, data, []any{}, [][]any{{"manager", tool.Get_language(db, "return", true)}}, map[string]string{})
+}

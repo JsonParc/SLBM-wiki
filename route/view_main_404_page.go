@@ -1,0 +1,66 @@
+package route
+
+import (
+	"opennamu/route/tool"
+)
+
+func View_main_404_page(config tool.Config, url string) string {
+	if url == "/" {
+		return tool.Get_redirect(Get_frontpage_url())
+	}
+
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	page_404_set := tool.Get_setting_value(db, "manage_404_page", "", "")
+
+	data_html := ""
+
+	page_404_dir := "404.html"
+	if tool.File_exist_check(page_404_dir) && page_404_set == "404_file" {
+		data_html = tool.File_text_read(page_404_dir)
+	} else {
+		db_data := tool.Get_setting_value(db, "manage_404_page_content", "", "")
+
+		if db_data != "" {
+			data_html = tool.Get_template(
+				db,
+				config,
+				"404",
+				db_data,
+				[]any{},
+				[][]any{},
+				map[string]string{},
+			)
+		} else {
+			data_in := tool.Get_language(db, "func_404_error", true)
+			data_in += "<hr class=\"main_hr\">"
+			data_in += "Path : " + tool.HTML_escape(url)
+
+			data_html = tool.Get_template(
+				db,
+				config,
+				"404",
+				data_in,
+				[]any{},
+				[][]any{},
+				map[string]string{},
+			)
+		}
+	}
+
+	return data_html
+}
+
+func Get_frontpage_url() string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	frontpage_type := tool.Get_setting_value(db, "frontpage_type", "", "document")
+	if frontpage_type == "bbs" {
+		return "/bbs/main"
+	}
+	frontpage := tool.Get_setting_value(db, "frontpage", "", "FrontPage")
+
+	return "/w/" + tool.Url_parser(frontpage)
+}

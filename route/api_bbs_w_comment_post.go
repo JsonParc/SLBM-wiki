@@ -1,0 +1,221 @@
+package route
+
+import (
+	"database/sql"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"opennamu/route/tool"
+)
+
+var bbs_comment_code_regex = regexp.MustCompile(`^[0-9]+(?:-[0-9]+)*$`)
+
+func Bbs_comment_closed(db *sql.DB, set_id string, set_code string) bool {
+	if set_id == thread_bbs_id {
+		return false
+	}
+
+	closed := ""
+	return tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'comment_close' and set_id = ? and set_code = ?",
+		[]any{&closed},
+		set_id,
+		set_code,
+	) && closed == "1"
+}
+
+func Bbs_comment_parent(db *sql.DB, set_id string, set_code string, comment_select string, ip string) (string, string, bool) {
+	base_id := set_id + "-" + set_code
+	if comment_select == "" || comment_select == "0" {
+		return base_id, "", true
+	}
+
+	if !bbs_comment_code_regex.MatchString(comment_select) {
+		return "", "", false
+	}
+
+	parts := strings.Split(comment_select, "-")
+	parent_id := base_id
+	if len(parts) > 1 {
+		parent_id += "-" + strings.Join(parts[:len(parts)-1], "-")
+	}
+
+	parent_user := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'comment_user_id' and set_id = ? and set_code = ?",
+		[]any{&parent_user},
+		parent_id,
+		parts[len(parts)-1],
+	) {
+		return "", "", false
+	}
+
+	blind := ""
+	tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'blind' and set_id = ? and set_code = ?",
+		[]any{&blind},
+		parent_id,
+		parts[len(parts)-1],
+	)
+	if blind == "O" && !tool.Check_permission(db, "bbs_comment_manage", ip) {
+		return "", "", false
+	}
+
+	return base_id + "-" + comment_select, parent_user, true
+}
+
+func Api_bbs_w_comment_post(config tool.Config, set_id string, set_code string, comment_select string, data string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+	if Bbs_is_special_board(set_id) && set_id != "0" && set_id != thread_bbs_id {
+		return_data["response"] = "not allowed"
+		return return_data
+	}
+
+	bbs_name := ""
+	bbs_type := "comment"
+	title := ""
+	post_user := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_set where set_name = 'bbs_name' and set_id = ?",
+		[]any{&bbs_name},
+		set_id,
+	) || !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_set where set_name = 'bbs_type' and set_id = ?",
+		[]any{&bbs_type},
+		set_id,
+	) || !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'title' and set_id = ? and set_code = ?",
+		[]any{&title},
+		set_id,
+		set_code,
+	) || !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'user_id' and set_id = ? and set_code = ?",
+		[]any{&post_user},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+		return return_data
+	}
+
+	if _, allowed := Bbs_post_view_auth(db, set_id, set_code, config.IP); !allowed {
+		return_data["response"] = "require auth"
+		return return_data
+	}
+
+	if !tool.Check_acl(db, set_id, "", "bbs_comment", config.IP) {
+		return_data["response"] = "require auth"
+		return return_data
+	}
+	if Bbs_comment_closed(db, set_id, set_code) {
+		return_data["response"] = "error"
+		return_data["data"] = "comment_closed"
+		return return_data
+	}
+
+	data = strings.ReplaceAll(data, "\r", "")
+	if data == "" {
+		return_data["response"] = "error"
+		return_data["data"] = "empty data"
+		return return_data
+	}
+	if !tool.Do_bbs_max_length_check(db, config, data) {
+		return_data["response"] = "error"
+		return_data["data"] = "bbs overflow max length"
+		return return_data
+	}
+	if !tool.Do_edit_filter(db, config, "", data) {
+		return_data["response"] = "error"
+		return_data["data"] = "edit filter (content)"
+		return return_data
+	}
+
+	parent_id := set_id + "-" + set_code
+	parent_user := ""
+	if bbs_type != "thread" {
+		var ok bool
+		parent_id, parent_user, ok = Bbs_comment_parent(db, set_id, set_code, comment_select, config.IP)
+		if !ok {
+			return_data["response"] = "not exist"
+			return_data["data"] = "comment"
+			return return_data
+		}
+	}
+	if !tool.Check_daily_limit(db, config.IP, "bbs_comment") {
+		return_data["response"] = "error"
+		return_data["data"] = "daily limit"
+		return return_data
+	}
+
+	comment_code := ""
+	date := tool.Get_time()
+	if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+		last_code := ""
+		tool.QueryRow_DB(
+			tx,
+			"select set_code from bbs_data where set_name = 'comment' and set_id = ? order by set_code + 0 desc limit 1",
+			[]any{&last_code},
+			parent_id,
+		)
+		comment_code = strconv.Itoa(tool.Str_to_int(last_code) + 1)
+
+		for _, value := range [][]string{
+			{"comment", data},
+			{"comment_date", date},
+			{"comment_user_id", config.IP},
+		} {
+			if _, err := tx.Exec(
+				tool.DB_change("insert into bbs_data (set_name, set_code, set_id, set_data) values (?, ?, ?, ?)"),
+				value[0],
+				comment_code,
+				parent_id,
+				value[1],
+			); err != nil {
+				return err
+			}
+		}
+		Bbs_post_comment_count_update(tx, set_id, set_code, 1)
+		Bbs_post_last_activity_update(tx, set_id, set_code, date)
+		if set_id == thread_bbs_id {
+			_, err := tx.Exec(
+				tool.DB_change("update bbs_data set set_data = ? where set_name = 'date' and set_id = ? and set_code = ?"),
+				tool.Get_time(),
+				set_id,
+				set_code,
+			)
+			return err
+		}
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+
+	end_code := comment_code
+	if bbs_type != "thread" && comment_select != "" && comment_select != "0" {
+		end_code = comment_select + "-" + comment_code
+	}
+	tool.Search_bbs_index_update_comment(db, set_id, set_code, end_code)
+	alarm := "BBS <a href=\"/bbs/w/" + tool.Url_parser(set_id) + "/" + tool.Url_parser(set_code) + "#" + tool.Url_parser(end_code) + "\">" + tool.HTML_escape(bbs_name) + " - " + tool.HTML_escape(title) + "#" + tool.HTML_escape(end_code) + "</a>"
+	tool.Send_alarm(db, config.IP, post_user, alarm)
+	if parent_user != "" {
+		tool.Send_alarm(db, config.IP, parent_user, alarm)
+	}
+	Bbs_watch_notify(db, config, set_id, set_code, end_code, bbs_name, title, post_user, parent_user)
+	Topic_reference_notify(db, config, data, end_code, set_code, set_id, bbs_name, title, "bbs")
+
+	return_data["response"] = "ok"
+	return_data["data"] = end_code
+	return return_data
+}

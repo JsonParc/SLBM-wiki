@@ -1,0 +1,188 @@
+package route
+
+import (
+	"database/sql"
+	"html"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"opennamu/route/tool"
+)
+
+var re_esc_a = regexp.MustCompile(`&lt;a([^\r\n]*?)&gt;([^\r\n]*?)&lt;/a&gt;`)
+var re_safe_url = regexp.MustCompile(`(^| )(https?://[^ ]+)`)
+
+func Get_safe_send_data(data string) string {
+	data = tool.HTML_escape(data)
+	if data == "&lt;br&gt;" || data == "" || strings.TrimSpace(data) == "" {
+		return "<br>"
+	}
+
+	data = strings.ReplaceAll(data, "javascript:", "")
+	data = re_safe_url.ReplaceAllStringFunc(data, func(match string) string {
+		prefix := ""
+		url := match
+		if strings.HasPrefix(match, " ") {
+			prefix = " "
+			url = match[1:]
+		}
+		return prefix + "<a href=\"" + url + "\">" + url + "</a>"
+	})
+
+	return re_esc_a.ReplaceAllStringFunc(data, func(match string) string {
+		parts := re_esc_a.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+
+		inner_escaped := parts[2]
+		inner_text := strings.TrimSpace(html.UnescapeString(inner_escaped))
+		if inner_text == "" || strings.ContainsAny(inner_text, "<>") {
+			return match
+		}
+
+		return "<a href=\"/w/" + tool.Url_parser(inner_text) + "\">" + strings.TrimSpace(inner_escaped) + "</a>"
+	})
+}
+
+func Get_ui_history(db *sql.DB, data_all [][]string) (string, string) {
+
+	date_heading := ""
+	data_html := ""
+	data_select := ""
+	tool_label := tool.HTML_escape(tool.Get_language(db, "tool", true))
+
+	for _, in_data := range data_all {
+
+		if in_data[6] != "" && in_data[1] == "" {
+			if date_heading != "----" {
+				data_html += "<h2>----</h2>"
+				date_heading = "----"
+			}
+
+			data_html += tool.Get_list_ui("----", "", "", "")
+			continue
+		}
+
+		data_select += `<option value="` + tool.HTML_escape(in_data[0]) + `">r` + tool.HTML_escape(in_data[0]) + ` | ` + tool.HTML_escape(in_data[2]) + `</option>`
+		doc_name := in_data[1]
+		doc_name_url := tool.Url_parser(doc_name)
+		rev_str := in_data[0]
+
+		left := `<a href="/w/` + doc_name_url + `">` + tool.HTML_escape(doc_name) + `</a> `
+		rev := ""
+
+		if in_data[6] != "" {
+			rev = `<span style="color: red;">r` + rev_str + `</span>`
+		} else {
+			rev = `r` + rev_str
+		}
+
+		rev_int := tool.Str_to_int(rev_str)
+		if rev_int > 1 {
+			before_rev := rev_int - 1
+			before_rev_str := strconv.Itoa(before_rev)
+
+			rev = `<a href="/diff/` + before_rev_str + `/` + rev_str + `/` + doc_name_url + `">` + rev + `</a>`
+		}
+
+		right := ""
+		right += `<a href="/history_tool/` + rev_str + `/` + doc_name_url + `" aria-label="` + tool_label + `">`
+		right += `<span class="opennamu_svg opennamu_svg_tool">&nbsp;</span></a>`
+		right += ` | `
+		right += rev + " | "
+
+		diff_size := in_data[5]
+		if diff_size == "0" {
+			right += `<span style="color: gray;">` + diff_size + `</span>`
+		} else if strings.Contains(diff_size, "+") {
+			right += `<span style="color: green;">` + diff_size + `</span>`
+		} else {
+			right += `<span style="color: red;">` + diff_size + `</span>`
+		}
+
+		right += " | "
+		right += in_data[7] + " | "
+
+		edit_type := "edit"
+		if in_data[8] != "" {
+			edit_type = in_data[8]
+		}
+
+		right += tool.Get_language(db, edit_type, true) + " | "
+
+		date_ui, date_text, new_date_heading := tool.Get_date_list_ui(in_data[2], date_heading)
+		date_heading = new_date_heading
+		data_html += date_ui
+		right += date_text
+
+		bottom := ``
+		if in_data[4] != "" {
+			bottom = Get_safe_send_data(in_data[4])
+		}
+
+		data_html += tool.Get_list_ui(left, right, bottom, "")
+
+	}
+
+	return data_html, data_select
+}
+
+func View_list_recent_change(config tool.Config, set_type string, limit string, num string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	sub := ""
+	if set_type == "" {
+		set_type = "normal"
+	} else if set_type == "watch" {
+		sub = "(" + tool.Get_language(db, "watchlist", true) + ")"
+	} else {
+		sub = "(" + tool.Get_language(db, set_type, true) + ")"
+	}
+
+	data_html := ""
+
+	menu_option := []string{"normal", "edit", "move", "delete", "revert", "r1", "file", "category"}
+	for _, option := range menu_option {
+		label := tool.Get_language(db, option, true)
+		data_html += `<a href="/recent_change/1/` + option + `">(` + label + `)</a> `
+	}
+	data_html += `<a href="/recent_change/1/user">(` + tool.Get_language(db, "user_document", true) + `)</a> `
+	if !tool.IP_or_user(config.IP) {
+		data_html += `<a href="/recent_change/1/watch">(` + tool.Get_language(db, "watchlist", true) + `)</a> `
+	}
+
+	api_data := Api_list_recent_change(config, set_type, limit, num)
+	if api_data["response"] != "ok" {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	api_data_list, _ := api_data["data"].([][]string)
+
+	history_ui, _ := Get_ui_history(db, api_data_list)
+
+	data_html += history_ui
+	if len(api_data_list) == 0 {
+		data_html += tool.Get_language(db, "data_missing", true)
+	}
+	data_html += tool.Get_page_control(
+		db,
+		tool.Str_to_int(num),
+		len(api_data_list),
+		tool.Str_to_int(limit),
+		"/recent_change/{}/"+set_type,
+	)
+
+	out := tool.Get_template(
+		db,
+		config,
+		tool.Get_language(db, "recent_change", true),
+		data_html,
+		[]any{sub},
+		[][]any{{"other", tool.Get_language(db, "return", true)}},
+		map[string]string{},
+	)
+
+	return out
+}

@@ -1,0 +1,79 @@
+package route
+
+import (
+	"database/sql"
+
+	"opennamu/route/tool"
+)
+
+func View_edit(config tool.Config, doc_name string, load_doc_name string) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+
+	if !tool.Do_title_length_check(db, doc_name, "document") {
+		return tool.Get_error_page(db, config, "title length")
+	}
+
+	var raw_data map[string]any
+	raw_data_get := ""
+	if load_doc_name == "" {
+		raw_data = Api_w_raw(config, doc_name, "", "")
+	} else {
+		raw_data = Api_w_raw(config, load_doc_name, "", "")
+	}
+
+	raw_response, _ := raw_data["response"].(string)
+	if raw_response == "ok" {
+		raw_data_get, _ = raw_data["data"].(string)
+	}
+
+	return View_edit_page(db, config, doc_name, load_doc_name, raw_data_get, "", "", "")
+}
+
+func View_edit_page(db *sql.DB, config tool.Config, doc_name string, load_doc_name string, raw_data_get string, send string, preview_name string, preview_data string) string {
+
+	check_box := tool.Get_edit_check_box_ui(db)
+	bottom_text := tool.Get_edit_bottom_text_ui(db, "edit")
+
+	editor_top_text := ""
+	if load_doc_name == "" {
+		editor_top_text += `<a href="/manager/15/` + tool.Url_parser(doc_name) + `">(` + tool.Get_language(db, "load", true) + `)</a> `
+	}
+
+	if editor_top_text != "" {
+		editor_top_text += `<hr class="main_hr">`
+	}
+
+	revision := tool.Get_document_revision(db, doc_name)
+	editor_data := tool.Get_editor_ui(db, config, raw_data_get, "edit", check_box+bottom_text, doc_name, "", Document_editor_top_render(db, doc_name))
+	if preview_name != "" {
+		editor_data += `<hr class="main_hr"><h2>` + tool.Get_language(db, "preview", true) + ` (` + preview_name + `)</h2>` + preview_data
+	}
+	form_data := editor_top_text + `<form action="/edit/` + tool.Url_parser(doc_name) + `" method="post">
+        <input type="hidden" name="ver" value="` + tool.HTML_escape(revision) + `">
+        <label for="edit_send">` + tool.Get_language(db, "why", true) + `</label>
+        <input id="edit_send" class="__ON_INPUT__" type="text" name="send" value="` + tool.HTML_escape(send) + `">
+        <hr class="main_hr">
+        ` + editor_data + `
+    </form>`
+
+	out := tool.Get_template(
+		db,
+		config,
+		doc_name,
+		form_data,
+		[]any{"(" + tool.Get_language(db, "edit", true) + ")"},
+		[][]any{
+			{"w/" + tool.Url_parser(doc_name), tool.Get_language(db, "return", true)},
+			{"delete/" + tool.Url_parser(doc_name), tool.Get_language(db, "delete", true)},
+			{"move/" + tool.Url_parser(doc_name), tool.Get_language(db, "move", true)},
+		},
+		map[string]string{},
+	)
+
+	return out
+}

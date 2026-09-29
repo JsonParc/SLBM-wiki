@@ -1,0 +1,101 @@
+package route
+
+import (
+	"database/sql"
+
+	"opennamu/route/tool"
+)
+
+func Api_bbs_w_delete(config tool.Config, set_id string, set_code string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+
+	bbs_name := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_set where set_id = ? and set_name = 'bbs_name'",
+		[]any{&bbs_name},
+		set_id,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "bbs"
+
+		return return_data
+	}
+
+	title := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'title' and set_id = ? and set_code = ?",
+		[]any{&title},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+
+		return return_data
+	}
+
+	user_id := ""
+	if !tool.QueryRow_DB(
+		db,
+		"select set_data from bbs_data where set_name = 'user_id' and set_id = ? and set_code = ?",
+		[]any{&user_id},
+		set_id,
+		set_code,
+	) {
+		return_data["response"] = "not exist"
+		return_data["data"] = "post"
+
+		return return_data
+	}
+
+	delete_allowed := tool.Check_permission(db, "bbs_delete", config.IP)
+	if set_id == report_bbs_id && tool.Check_permission(db, "bbs_manage", config.IP) {
+		delete_allowed = true
+	}
+	if !delete_allowed {
+		return_data["response"] = "require auth"
+
+		return return_data
+	}
+
+	if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+		for _, value := range []struct {
+			query string
+			args  []any
+		}{
+			{
+				"delete from user_set where name = 'bbs_watchlist' and data = ?",
+				[]any{Bbs_watch_key(set_id, set_code)},
+			},
+			{
+				"delete from bbs_data where set_id = ? and set_code = ?",
+				[]any{set_id, set_code},
+			},
+			{
+				"delete from bbs_set where set_id = ? and set_code = ?",
+				[]any{set_id, set_code},
+			},
+			{
+				"delete from bbs_data where set_id = ? or set_id like ?",
+				[]any{set_id + "-" + set_code, set_id + "-" + set_code + "-%"},
+			},
+		} {
+			if _, err := tx.Exec(tool.DB_change(value.query), value.args...); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+	tool.Search_bbs_index_delete(set_id, set_code)
+
+	return_data["response"] = "ok"
+
+	return return_data
+}

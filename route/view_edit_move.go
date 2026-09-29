@@ -1,0 +1,80 @@
+package route
+
+import (
+	"net/url"
+
+	"opennamu/route/tool"
+)
+
+func View_edit_move(config tool.Config, doc_name string, values url.Values) string {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	if values != nil {
+		api_data := Api_edit_move_post(config, doc_name, values)
+		response, _ := api_data["response"].(string)
+		if response == "require auth" {
+			return tool.Get_error_page(db, config, "auth")
+		}
+		if response == "not exist" {
+			return tool.Get_redirect("/w/" + tool.Url_parser(doc_name))
+		}
+		if response != "ok" {
+			error_name, _ := api_data["data"].(string)
+			if error_name == "" {
+				error_name = "error"
+			}
+			return tool.Get_error_page(db, config, error_name)
+		}
+		new_name, ok := api_data["data"].(string)
+		if !ok || new_name == "" {
+			return tool.Get_error_page(db, config, "error")
+		}
+		return tool.Get_redirect("/w/" + tool.Url_parser(new_name))
+	}
+
+	if !tool.Check_acl(db, doc_name, "", "document_move", config.IP) {
+		return tool.Get_error_page(db, config, "auth")
+	}
+	_, source_exists := tool.Get_data_title(db, doc_name)
+	if !source_exists {
+		return tool.Get_redirect("/w/" + tool.Url_parser(doc_name))
+	}
+	owner_auth := tool.Check_permission(db, "document_move_manage", config.IP)
+	body := "<form method=\"post\">"
+	body += `<div><label for="title">` + tool.Get_language(db, "document_name", true) + `</label><input id="title" name="title" value="` + tool.HTML_escape(doc_name) + `"></div><hr class="main_hr">`
+	body += `<div><label for="send">` + tool.Get_language(db, "why", true) + `</label><input id="send" name="send"></div><hr class="main_hr">`
+
+	body += `<h2><label for="move_option">` + tool.Get_language(db, "document", true) + `</label></h2>`
+	body += `<select id="move_option" name="move_option">`
+	body += "<option value=\"normal\" selected>" + tool.Get_language(db, "normal", true) + "</option>"
+	body += "<option value=\"none\">" + tool.Get_language(db, "dont_move", true) + "</option>"
+	body += "<option value=\"reverse\">" + tool.Get_language(db, "replace_move", true) + "</option>"
+	if owner_auth {
+		body += "<option value=\"merge\">" + tool.Get_language(db, "merge_move", true) + "</option>"
+	}
+	body += "</select><hr class=\"main_hr\">"
+
+	body += `<h2><label for="move_topic_option">` + tool.Get_language(db, "thread_bbs", true) + `</label></h2>`
+	body += `<select id="move_topic_option" name="move_topic_option">`
+	body += "<option value=\"none\" selected>" + tool.Get_language(db, "dont_move", true) + "</option>"
+	body += "<option value=\"normal\">" + tool.Get_language(db, "normal", true) + "</option>"
+	body += "<option value=\"reverse\">" + tool.Get_language(db, "replace_move", true) + "</option>"
+	if owner_auth {
+		body += "<option value=\"merge\">" + tool.Get_language(db, "merge_move", true) + "</option>"
+	}
+	body += "</select><hr class=\"main_hr\">"
+
+	if owner_auth {
+		body += `<h2><label for="document_set_option">` + tool.Get_language(db, "document_set", true) + `</label></h2>`
+		body += `<select id="document_set_option" name="document_set_option">`
+		body += "<option value=\"normal\" selected>" + tool.Get_language(db, "normal", true) + "</option>"
+		body += "<option value=\"none\">" + tool.Get_language(db, "dont_move", true) + "</option>"
+		body += "<option value=\"reverse\">" + tool.Get_language(db, "replace_move", true) + "</option>"
+		body += "</select><hr class=\"main_hr\">"
+	}
+
+	body += tool.Get_captcha_ui(db, config) + tool.Get_IP_warning_ui(db, config) + tool.Get_edit_check_box_ui(db) + tool.Get_edit_bottom_text_ui(db, "move")
+	body += "<button type=\"submit\">" + tool.Get_language(db, "move", true) + "</button></form>"
+	return tool.Get_template(db, config, doc_name, body, []any{"(" + tool.Get_language(db, "move", true) + ")"}, [][]any{{"w/" + tool.Url_parser(doc_name), tool.Get_language(db, "return", true)}, {"move_all", tool.Get_language(db, "multiple_move", true)}}, map[string]string{})
+}

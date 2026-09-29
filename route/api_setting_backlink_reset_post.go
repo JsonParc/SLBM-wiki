@@ -1,0 +1,75 @@
+package route
+
+import (
+	"database/sql"
+	"strconv"
+	"time"
+
+	"opennamu/route/tool"
+)
+
+func Api_setting_backlink_reset_post(config tool.Config) map[string]any {
+	return Api_setting_backlink_reset_post_internal(config, "")
+}
+
+func Api_setting_backlink_reset_post_internal(config tool.Config, load string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
+
+	return_data := make(map[string]any)
+	if !tool.Check_permission(db, "setting_backlink", config.IP) {
+		return_data["response"] = "require auth"
+
+		return return_data
+	}
+
+	if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(tool.DB_change("delete from back where type != 'cat_manual'")); err != nil {
+			return err
+		}
+		_, err := tx.Exec(tool.DB_change("delete from data_set where set_name = 'link_count'"))
+		return err
+	}); err != nil {
+		panic(err)
+	}
+
+	document_count := 0
+	error_count := 0
+	page := 1
+	delay := map[string]time.Duration{
+		"normal": 10 * time.Millisecond,
+		"slow":   100 * time.Millisecond,
+	}[load]
+
+	for {
+		title_data := Api_list_title_index(config, strconv.Itoa(page))
+		title_list := title_data["data"].([]string)
+
+		for _, doc_name := range title_list {
+			raw_data := Api_w_raw(config, doc_name, "", "")
+			response, ok := raw_data["response"].(string)
+			if !ok || response != "ok" {
+				error_count++
+				continue
+			}
+
+			Api_w_render(config, doc_name, raw_data["data"].(string), "backlink", "")
+			document_count++
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+		}
+
+		if len(title_list) < 50 {
+			break
+		}
+
+		page++
+	}
+
+	return_data["response"] = "ok"
+	return_data["document_count"] = document_count
+	return_data["error_count"] = error_count
+
+	return return_data
+}
