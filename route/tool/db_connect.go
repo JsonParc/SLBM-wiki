@@ -215,6 +215,10 @@ func QueryRow_DB(db DB_runner, query string, var_list []any, values ...any) bool
 	}
 }
 
+func DB_type() string {
+	return db_set["db_type"]
+}
+
 func DB_boot() map[string]string {
 	new_db_set := Get_DB_set()
 	if new_db_set["db_type"] == "mysql" {

@@ -32,7 +32,7 @@ func View_user_safe(config tool.Config, user_name string) string {
 	}
 	if Clan_admin(db, config) {
 		body = `<p><a href="/clan/hall">` + tool.Get_language(db, "clan_hall_manage", true) + `</a></p>` + body
-		body = `<nav class="slbm-admin-links"><a href="/clan/users">` + tool.Get_language(db, "clan_users", true) + `</a> · <a href="/app_submit">` + tool.Get_language(db, "application_list", true) + `</a> · <a href="/manager">` + tool.Get_language(db, "admin_tool", true) + `</a></nav>` + body
+		body = `<nav class="slbm-admin-links"><a href="/clan/users">` + tool.Get_language(db, "clan_users", true) + `</a> · <a href="/app_submit">` + tool.Get_language(db, "application_list", true) + `</a> · <a href="/clan/backup">` + tool.Get_language(db, "clan_backup", true) + `</a> · <a href="/manager">` + tool.Get_language(db, "admin_tool", true) + `</a></nav>` + body
 	}
 	if is_self {
 		alarm_count := tool.Get_user_notice_unread_count(db, config.IP)
