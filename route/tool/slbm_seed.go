@@ -21,6 +21,8 @@ func Ensure_slbm_defaults(db *sql.DB) {
 	if !QueryRow_DB(db, "select data from data where title = ? limit 1", []any{&frontpage}, "SLBM: 대문") {
 		Exec_DB(db, "insert into data(title,data) values (?,?)", "SLBM: 대문", string(slbm_frontpage))
 	}
+	Exec_DB(db, "update other set data = ? where name = 'frontpage' and coverage = '' and (data = '' or data = 'FrontPage')", "SLBM: 대문")
+	Exec_DB(db, "update other set data = ? where name = 'name' and coverage = '' and (data = '' or data = 'Wiki')", "SLBM 클랜 위키")
 
 	slbm_seed_setting(db, "frontpage_type", "document")
 	slbm_seed_setting(db, "frontpage", "SLBM: 대문")
