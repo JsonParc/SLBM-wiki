@@ -47,6 +47,9 @@ type Clan_penalty_log struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
+// Clan_penalty_actions lists the log actions this version writes.
+var Clan_penalty_actions = []string{"add", "increase", "decrease", "delete", "restore"}
+
 type Clan_penalty_file struct {
 	Version int                  `json:"version"`
 	Entries []Clan_penalty_entry `json:"entries"`
@@ -90,7 +93,8 @@ func Clan_penalty_parse(raw []byte) (Clan_penalty_file, error) {
 	}
 	seen := map[string]bool{}
 	for _, entry := range data.Entries {
-		if entry.ID == "" || seen[entry.ID] || clan_penalty_check(entry.Name, entry.Points, entry.Reason) != nil {
+		// Stored entries may be negative: a decrease is recorded as its own entry.
+		if entry.ID == "" || seen[entry.ID] || entry.Points == 0 || clan_penalty_check(entry.Name, max(entry.Points, -entry.Points), entry.Reason) != nil {
 			return data, errors.New("clan_penalty_invalid")
 		}
 		seen[entry.ID] = true
@@ -236,6 +240,35 @@ func Api_clan_penalty_post(config tool.Config, values url.Values) error {
 		}
 		data.Entries = append(data.Entries, entry)
 		data.Log = append(data.Log, clan_penalty_log(config, "add", entry))
+	case "increase", "decrease":
+		// Adjust an existing name by one point; the change is its own entry.
+		name := values.Get("name")
+		total, exists := 0, false
+		for _, entry := range data.Entries {
+			if entry.Name == name {
+				total += entry.Points
+				exists = true
+			}
+		}
+		if !exists {
+			return errors.New("not exist")
+		}
+		points := 1
+		if values.Get("action") == "decrease" {
+			if total <= 0 {
+				return errors.New("clan_penalty_zero")
+			}
+			points = -1
+		}
+		entry := Clan_penalty_entry{
+			ID: tool.Get_random_key(16), Name: name, Points: points,
+			Reason: strings.TrimSpace(values.Get("reason")), Date: tool.Get_time(), By: config.IP,
+		}
+		if err := clan_penalty_check(entry.Name, 1, entry.Reason); err != nil {
+			return err
+		}
+		data.Entries = append(data.Entries, entry)
+		data.Log = append(data.Log, clan_penalty_log(config, values.Get("action"), entry))
 	case "delete":
 		id := values.Get("id")
 		index := -1

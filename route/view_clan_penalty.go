@@ -33,10 +33,10 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 
 	if values != nil {
 		if err := Api_clan_penalty_post(config, values); err != nil {
-			if err.Error() != "clan_penalty_input" {
+			if err.Error() != "clan_penalty_input" && err.Error() != "clan_penalty_zero" {
 				return tool.Get_error_page(db, config, err.Error())
 			}
-			notice = "clan_penalty_input"
+			notice = err.Error()
 		} else {
 			return tool.Get_redirect("/clan/penalty")
 		}
@@ -90,6 +90,11 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 		for _, row := range page.Rows {
 			body.WriteString(`<tr><td>` + escape(row.Name) + `</td><td>` + strconv.Itoa(row.Points) + `</td><td>` + strconv.Itoa(row.Total) +
 				`</td><td>` + escape(row.Reason) + `</td><td>` + escape(row.Date) + `</td><td>` + escape(row.By) + `</td><td>` +
+				`<details class="slbm-penalty-adjust"><summary>` + lang("clan_penalty_adjust") + `</summary>` +
+				`<form method="post" action="/clan/penalty">` + csrf + `<input type="hidden" name="name" value="` + escape(row.Name) + `">` +
+				`<p><label>` + lang("clan_penalty_reason") + ` <input name="reason" required maxlength="1000" autocomplete="off"></label></p>` +
+				`<p><button name="action" value="increase">` + lang("clan_penalty_increase") + `</button> ` +
+				`<button name="action" value="decrease">` + lang("clan_penalty_decrease") + `</button></p></form></details>` +
 				`<form method="post" action="/clan/penalty" onsubmit="return confirm(this.dataset.confirm)" data-confirm="` + escape(lang("clan_penalty_delete_confirm")) + `">` + csrf +
 				`<input type="hidden" name="id" value="` + escape(row.ID) + `"><button name="action" value="delete">` + lang("delete") + `</button></form></td></tr>`)
 		}
@@ -113,7 +118,7 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 		body.WriteString(`<ul class="slbm-penalty-log">`)
 		for _, item := range page.Log {
 			action := escape(item.Action)
-			if tool.Arr_in_str([]string{"add", "delete", "restore"}, item.Action) {
+			if tool.Arr_in_str(Clan_penalty_actions, item.Action) {
 				action = lang("clan_penalty_action_" + item.Action)
 			}
 			line := escape(item.Time) + ` · ` + escape(item.By) + ` · ` + action
