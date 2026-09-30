@@ -106,6 +106,13 @@ func Api_clan_backup_export(config tool.Config) ([]byte, string, error) {
 		return nil, "", err
 	}
 
+	clan_penalty_lock.Lock()
+	err = add_file("clan_penalty.json", Clan_penalty_path())
+	clan_penalty_lock.Unlock()
+	if err != nil && !os.IsNotExist(err) {
+		return nil, "", err
+	}
+
 	entries, err := os.ReadDir(clan_backup_images_dir())
 	if err != nil && !os.IsNotExist(err) {
 		return nil, "", err
@@ -205,8 +212,22 @@ func Api_clan_backup_restore(config tool.Config, raw []byte) (Clan_backup_result
 
 	backup_db := ""
 	images := []*zip.File{}
+	var penalty []byte
 	for _, file := range archive.File {
 		switch {
+		case file.Name == "clan_penalty.json":
+			source, err := file.Open()
+			if err != nil {
+				return result, errors.New("clan_backup_invalid")
+			}
+			penalty, err = io.ReadAll(io.LimitReader(source, Clan_penalty_max_upload+1))
+			source.Close()
+			if err != nil || len(penalty) > Clan_penalty_max_upload {
+				return result, errors.New("clan_backup_invalid")
+			}
+			if _, err := Clan_penalty_parse(penalty); err != nil {
+				return result, errors.New("clan_backup_invalid")
+			}
 		case file.Name == "data.db":
 			if file.UncompressedSize64 > clan_backup_db_max_size {
 				return result, errors.New("clan_backup_invalid")
@@ -321,6 +342,15 @@ func Api_clan_backup_restore(config tool.Config, raw []byte) (Clan_backup_result
 			return result, err
 		}
 		result.Images++
+	}
+
+	if penalty != nil {
+		clan_penalty_lock.Lock()
+		err := Clan_penalty_write(penalty)
+		clan_penalty_lock.Unlock()
+		if err != nil {
+			return result, err
+		}
 	}
 
 	// Bring the live search index in line with the restored documents.

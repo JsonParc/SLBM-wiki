@@ -2,6 +2,7 @@ package route
 
 import (
 	"crypto/subtle"
+	"log"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,7 @@ func View_clan_backup(config tool.Config, restore bool, csrf string, raw []byte,
 		if err != nil {
 			message := err.Error()
 			if message != "auth" && message != "clan_backup_invalid" && message != "clan_backup_sqlite_only" {
+				log.Printf("[BACKUP] restore failed: %v", err)
 				message = "clan_backup_failed"
 			}
 			notice.WriteString(`<p class="slbm-backup-error">` + lang(message) + `</p>`)

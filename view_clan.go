@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"opennamu/route"
+	"time"
 )
 
 const clan_backup_max_upload = 512 * 1024 * 1024
@@ -71,6 +72,62 @@ func View_clan_routes(r *gin.Engine) {
 			return
 		}
 		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_backup(Make_route_config(c), true, c.Request.PostFormValue("csrf"), raw, "")))
+	})
+	r.GET("/clan/staff", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_staff(Make_route_config(c), nil)))
+	})
+	r.POST("/clan/staff", func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16384)
+		if c.Request.ParseForm() != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_staff(Make_route_config(c), c.Request.PostForm)))
+	})
+	r.GET("/clan/penalty", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), "recent", nil, "")))
+	})
+	r.GET("/clan/penalty/sort/:sort", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), c.Param("sort"), nil, "")))
+	})
+	r.POST("/clan/penalty", func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16384)
+		if c.Request.ParseForm() != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), "recent", c.Request.PostForm, "")))
+	})
+	r.GET("/clan/penalty/download", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		raw, err := route.Api_clan_penalty_export(Make_route_config(c))
+		if err != nil {
+			Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), "recent", nil, "")))
+			return
+		}
+		c.Header("Content-Disposition", `attachment; filename="clan-penalty-`+time.Now().Format("20060102-150405")+`.json"`)
+		c.Data(http.StatusOK, "application/json; charset=utf-8", raw)
+	})
+	r.POST("/clan/penalty/restore", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, route.Clan_penalty_max_upload)
+		file, _, err := c.Request.FormFile("penalty")
+		if err != nil {
+			Write_data(c, http.StatusBadRequest, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), "recent", nil, "clan_penalty_invalid")))
+			return
+		}
+		defer file.Close()
+		raw, err := io.ReadAll(file)
+		if err != nil {
+			Write_data(c, http.StatusBadRequest, "text/html; charset=utf-8", []byte(route.View_clan_penalty(Make_route_config(c), "recent", nil, "clan_penalty_invalid")))
+			return
+		}
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route.View_clan_penalty_restore(Make_route_config(c), c.Request.PostFormValue("csrf"), raw)))
 	})
 	r.GET("/clan/users", func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")

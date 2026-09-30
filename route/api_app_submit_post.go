@@ -10,6 +10,15 @@ import (
 	"opennamu/route/tool"
 )
 
+// Clan_app_permission extends a signup-approval permission to clan staff.
+func Clan_app_permission(db *sql.DB, permission string, ip string) bool {
+	if tool.Check_permission(db, permission, ip) {
+		return true
+	}
+	role := tool.Get_clan_role(db, ip)
+	return role == tool.Clan_role_sus || role == tool.Clan_role_manager
+}
+
 func App_submit_action(db *sql.DB, config tool.Config, user_id string, approve bool) bool {
 	if !approve {
 		if err := tool.DB_transaction(db, func(tx *sql.Tx) error {
@@ -133,12 +142,12 @@ func Api_app_submit_post(config tool.Config, values url.Values) map[string]any {
 	defer tool.DB_close(db)
 
 	return_data := make(map[string]any)
-	if !tool.Check_permission(db, "application_manage", config.IP) {
+	if !Clan_app_permission(db, "application_manage", config.IP) {
 		return_data["response"] = "require auth"
 		return return_data
 	}
 	if values.Get("approve") != "" || values.Get("decline") != "" {
-		if !tool.Check_permission(db, "application_view", config.IP) {
+		if !Clan_app_permission(db, "application_view", config.IP) {
 			return_data["response"] = "require auth"
 			return return_data
 		}
