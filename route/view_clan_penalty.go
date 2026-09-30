@@ -81,26 +81,40 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 		}
 	}
 	body.WriteString(`</p>`)
-	if len(page.Rows) == 0 {
+	if len(page.Summaries) == 0 {
 		body.WriteString(`<p>` + lang("clan_penalty_empty") + `</p>`)
 	} else {
 		body.WriteString(`<div class="table_safe"><table class="slbm-penalty-table"><thead><tr><th>` + lang("clan_penalty_name") + `</th><th>` +
-			lang("clan_penalty_points") + `</th><th>` + lang("clan_penalty_total") + `</th><th>` + lang("clan_penalty_reason") + `</th><th>` +
-			lang("clan_penalty_date") + `</th><th>` + lang("clan_penalty_by") + `</th><th></th></tr></thead><tbody>`)
-		for _, row := range page.Rows {
-			body.WriteString(`<tr><td>` + escape(row.Name) + `</td><td>` + strconv.Itoa(row.Points) + `</td><td>` + strconv.Itoa(row.Total) +
-				`</td><td>` + escape(row.Reason) + `</td><td>` + escape(row.Date) + `</td><td>` + escape(row.By) + `</td><td>` +
+			lang("clan_penalty_total") + `</th><th>` + lang("clan_penalty_count") + `</th><th>` + lang("clan_penalty_last_date") + `</th><th>` +
+			lang("clan_penalty_last_reason") + `</th><th></th></tr></thead><tbody>`)
+		for _, row := range page.Summaries {
+			body.WriteString(`<tr><td>` + escape(row.Name) + `</td><td>` + strconv.Itoa(row.Total) + `</td><td>` + strconv.Itoa(row.Count) +
+				`</td><td>` + escape(row.Last_date) + `</td><td>` + escape(row.Last_reason) + `</td><td>` +
 				`<details class="slbm-penalty-adjust"><summary>` + lang("clan_penalty_adjust") + `</summary>` +
 				`<form method="post" action="/clan/penalty">` + csrf + `<input type="hidden" name="name" value="` + escape(row.Name) + `">` +
 				`<p><label>` + lang("clan_penalty_reason") + ` <input name="reason" required maxlength="1000" autocomplete="off"></label></p>` +
 				`<p><button name="action" value="increase">` + lang("clan_penalty_increase") + `</button> ` +
-				`<button name="action" value="decrease">` + lang("clan_penalty_decrease") + `</button></p></form></details>` +
-				`<form method="post" action="/clan/penalty" onsubmit="return confirm(this.dataset.confirm)" data-confirm="` + escape(lang("clan_penalty_delete_confirm")) + `">` + csrf +
-				`<input type="hidden" name="id" value="` + escape(row.ID) + `"><button name="action" value="delete">` + lang("delete") + `</button></form></td></tr>`)
+				`<button name="action" value="decrease">` + lang("clan_penalty_decrease") + `</button></p></form></details></td></tr>`)
 		}
 		body.WriteString(`</tbody></table></div>`)
 	}
 	body.WriteString(`<hr class="main_hr">`)
+
+	// Individual entries are a read-only record, folded by default.
+	body.WriteString(`<details class="slbm-penalty-entries"><summary><h2><span aria-hidden="true">▸ </span>` + lang("clan_penalty_entries") + ` (` + strconv.Itoa(len(page.Entries)) + `)</h2></summary>`)
+	if len(page.Entries) == 0 {
+		body.WriteString(`<p>` + lang("clan_penalty_empty") + `</p>`)
+	} else {
+		body.WriteString(`<div class="table_safe"><table class="slbm-penalty-entry-table"><thead><tr><th>` + lang("clan_penalty_name") + `</th><th>` +
+			lang("clan_penalty_points") + `</th><th>` + lang("clan_penalty_reason") + `</th><th>` + lang("clan_penalty_date") + `</th><th>` +
+			lang("clan_penalty_by") + `</th></tr></thead><tbody>`)
+		for _, entry := range page.Entries {
+			body.WriteString(`<tr><td>` + escape(entry.Name) + `</td><td>` + strconv.Itoa(entry.Points) + `</td><td>` + escape(entry.Reason) +
+				`</td><td>` + escape(entry.Date) + `</td><td>` + escape(entry.By) + `</td></tr>`)
+		}
+		body.WriteString(`</tbody></table></div>`)
+	}
+	body.WriteString(`</details><hr class="main_hr">`)
 
 	body.WriteString(`<h2>` + lang("clan_penalty_file") + `</h2><p><a href="/clan/penalty/download">` + lang("clan_penalty_download") + `</a></p>`)
 	if page.Can_restore {
@@ -111,7 +125,7 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 	}
 	body.WriteString(`<hr class="main_hr">`)
 
-	body.WriteString(`<h2>` + lang("clan_penalty_log") + `</h2>`)
+	body.WriteString(`<details class="slbm-penalty-log-section"><summary><h2><span aria-hidden="true">▸ </span>` + lang("clan_penalty_log") + ` (` + strconv.Itoa(len(page.Log)) + `)</h2></summary>`)
 	if len(page.Log) == 0 {
 		body.WriteString(`<p>` + lang("clan_penalty_log_empty") + `</p>`)
 	} else {
@@ -131,5 +145,6 @@ func View_clan_penalty(config tool.Config, sort_by string, values url.Values, no
 		}
 		body.WriteString(`</ul>`)
 	}
+	body.WriteString(`</details>`)
 	return tool.Get_template(db, config, lang("clan_penalty"), body.String(), []any{}, [][]any{}, map[string]string{})
 }

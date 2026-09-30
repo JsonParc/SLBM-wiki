@@ -3,7 +3,64 @@ package tool
 import (
 	"database/sql"
 	_ "embed"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
 )
+
+// Seed_slbm_data_dir fills an empty data directory (such as a freshly mounted
+// persistent disk) from the files committed with the source. Existing files
+// are never overwritten, so live data on the disk always wins.
+func Seed_slbm_data_dir() {
+	entries, err := os.ReadDir(filepath.Join("seed", "images"))
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				slbm_seed_copy(filepath.Join("seed", "images", entry.Name()), filepath.Join("data", "images", entry.Name()))
+			}
+		}
+	}
+
+	// NAMU_DB points the engine at the disk (e.g. data/data); start it from the committed data.db.
+	if db_name, ok := os.LookupEnv("NAMU_DB"); ok && db_name != "" && filepath.Clean(db_name) != "data" {
+		slbm_seed_copy("data.db", db_name+".db")
+	}
+}
+
+func slbm_seed_copy(source string, target string) {
+	if _, err := os.Stat(target); err == nil {
+		return
+	}
+	input, err := os.Open(source)
+	if err != nil {
+		return
+	}
+	defer input.Close()
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		log.Printf("[SEED] %s: %v", target, err)
+		return
+	}
+	temp := target + ".seed"
+	output, err := os.Create(temp)
+	if err != nil {
+		log.Printf("[SEED] %s: %v", target, err)
+		return
+	}
+	_, err = io.Copy(output, input)
+	if close_err := output.Close(); err == nil {
+		err = close_err
+	}
+	if err == nil {
+		err = os.Rename(temp, target)
+	}
+	if err != nil {
+		os.Remove(temp)
+		log.Printf("[SEED] %s: %v", target, err)
+		return
+	}
+	log.Printf("[SEED] created %s", target)
+}
 
 //go:embed slbm-frontpage.namumark
 var slbm_frontpage []byte

@@ -47,7 +47,8 @@ type Clan_penalty_log struct {
 	Reason   string `json:"reason,omitempty"`
 }
 
-// Clan_penalty_actions lists the log actions this version writes.
+// Clan_penalty_actions lists the log actions that have labels; "delete" only
+// appears in logs written before entries became read-only.
 var Clan_penalty_actions = []string{"add", "increase", "decrease", "delete", "restore"}
 
 type Clan_penalty_file struct {
@@ -56,13 +57,18 @@ type Clan_penalty_file struct {
 	Log     []Clan_penalty_log   `json:"log"`
 }
 
-type Clan_penalty_row struct {
-	Clan_penalty_entry
-	Total int
+// Clan_penalty_summary is one member's accumulated penalty.
+type Clan_penalty_summary struct {
+	Name        string
+	Total       int
+	Count       int
+	Last_date   string
+	Last_reason string
 }
 
 type Clan_penalty_page struct {
-	Rows        []Clan_penalty_row
+	Summaries   []Clan_penalty_summary
+	Entries     []Clan_penalty_entry
 	Log         []Clan_penalty_log
 	Can_restore bool
 }
@@ -157,8 +163,8 @@ func clan_penalty_log(config tool.Config, action string, entry Clan_penalty_entr
 	}
 }
 
-// Api_clan_penalty_list returns entries sorted by "name", "points" (total per
-// name), or "recent", plus the change log newest first.
+// Api_clan_penalty_list returns per-name totals sorted by "name", "points",
+// or "recent", plus every entry and the change log, newest first.
 func Api_clan_penalty_list(config tool.Config, sort_by string) (Clan_penalty_page, error) {
 	page := Clan_penalty_page{}
 	role := clan_penalty_role(config)
@@ -174,31 +180,35 @@ func Api_clan_penalty_list(config tool.Config, sort_by string) (Clan_penalty_pag
 		return page, err
 	}
 
-	totals := map[string]int{}
-	for _, entry := range data.Entries {
-		totals[entry.Name] += entry.Points
-	}
-	// Newest first, so entries added within the same second keep a stable order.
+	// Entries newest first, so ones added within the same second keep a stable order.
 	for index := len(data.Entries) - 1; index >= 0; index-- {
-		entry := data.Entries[index]
-		page.Rows = append(page.Rows, Clan_penalty_row{entry, totals[entry.Name]})
+		page.Entries = append(page.Entries, data.Entries[index])
 	}
-	sort.SliceStable(page.Rows, func(i, j int) bool {
-		left, right := page.Rows[i], page.Rows[j]
+
+	// One summary per name; the first entry seen for a name is its latest.
+	positions := map[string]int{}
+	for _, entry := range page.Entries {
+		position, exists := positions[entry.Name]
+		if !exists {
+			position = len(page.Summaries)
+			positions[entry.Name] = position
+			page.Summaries = append(page.Summaries, Clan_penalty_summary{Name: entry.Name, Last_date: entry.Date, Last_reason: entry.Reason})
+		}
+		page.Summaries[position].Total += entry.Points
+		page.Summaries[position].Count++
+	}
+	sort.SliceStable(page.Summaries, func(i, j int) bool {
+		left, right := page.Summaries[i], page.Summaries[j]
 		switch sort_by {
 		case "name":
-			if left.Name != right.Name {
-				return left.Name < right.Name
-			}
+			return left.Name < right.Name
 		case "points":
 			if left.Total != right.Total {
 				return left.Total > right.Total
 			}
-			if left.Name != right.Name {
-				return left.Name < right.Name
-			}
+			return left.Name < right.Name
 		}
-		return left.Date > right.Date
+		return left.Last_date > right.Last_date
 	})
 
 	page.Log = make([]Clan_penalty_log, len(data.Log))
@@ -208,7 +218,8 @@ func Api_clan_penalty_list(config tool.Config, sort_by string) (Clan_penalty_pag
 	return page, nil
 }
 
-// Api_clan_penalty_post adds (action "add") or deletes (action "delete") an entry.
+// Api_clan_penalty_post adds an entry (action "add") or adjusts an existing
+// name by one point ("increase" / "decrease"). Entries are never removed.
 func Api_clan_penalty_post(config tool.Config, values url.Values) error {
 	if !Clan_penalty_staff(clan_penalty_role(config)) {
 		return errors.New("require auth")
@@ -269,19 +280,6 @@ func Api_clan_penalty_post(config tool.Config, values url.Values) error {
 		}
 		data.Entries = append(data.Entries, entry)
 		data.Log = append(data.Log, clan_penalty_log(config, values.Get("action"), entry))
-	case "delete":
-		id := values.Get("id")
-		index := -1
-		for i, entry := range data.Entries {
-			if entry.ID == id {
-				index = i
-			}
-		}
-		if index < 0 {
-			return errors.New("not exist")
-		}
-		data.Log = append(data.Log, clan_penalty_log(config, "delete", data.Entries[index]))
-		data.Entries = append(data.Entries[:index], data.Entries[index+1:]...)
 	default:
 		return errors.New("error")
 	}
