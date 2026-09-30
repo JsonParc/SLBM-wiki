@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시점유도 미사일 · Naval Lab</title>
+<link rel="stylesheet" href="style.css?v=14">
+</head>
+<body>
+<main>
+  <header><div><span class="eyebrow">NAVAL LAB / INTERACTIVE SIMULATION</span><h1>시점유도 미사일 <span>2D</span></h1><p>발사부터 재유도까지, 커서로 만드는 비행 궤적.</p></div><div class="live"><i></i> LOCAL SIMULATION</div></header>
+  <section class="metrics"><div>초기 속도<strong>233 <small>unit/s</small></strong></div><div>최대 속도<strong>485 <small>unit/s</small></strong></div><div>가속도<strong>140 <small>unit/s²</small></strong></div><div>재장전<strong>20 <small>sec</small></strong></div></section>
+  <section id="stage">
+<div id="cameraToolbar"><button id="homeView">발사함 보기</button><button id="zoomOut" aria-label="축소">−</button><span id="zoomLabel">100%</span><button id="zoomIn" aria-label="확대">+</button><button id="fit">전장 전체 보기</button><button id="fullscreen">전체화면</button><label for="pan">화면 이동</label><input id="pan" type="range" min="0" max="6800" step="1" value="0" aria-label="전장 가로 이동"></div>
+<section class="viewport"><canvas id="scene" aria-label="바다 단면에서 미사일을 발사하고 마우스 위치로 유도하는 시뮬레이션"></canvas><div class="overlay"><span id="mode">01 / VLS · 4연장</span><span id="telemetry">발사 대기</span></div><div class="bottom-overlay"><span>바다 단면 · 양옆 발사는 좌우로 투영</span><span id="stats">명중 0 · 소멸 0</span></div></section>
+  <section class="controls"><div class="slots" id="slots"></div><div class="actions"><button id="fire" class="primary">발사 <kbd>SPACE</kbd></button><button id="pause" aria-label="일시정지">일시정지</button><button id="reset">초기화</button></div></section>
+  </section>
+<section class="footer"><div><h2>조작 방법</h2><p><kbd>1</kbd>–<kbd>4</kbd> 슬롯 선택 · <kbd>SPACE</kbd> 또는 화면 클릭으로 발사<br>마우스로 유도 · 다른 슬롯으로 전환하면 마지막 진행 방향 유지<br>기존 슬롯을 다시 선택하면 비행 중인 미사일에 유도선 재연결</p><p class="note">1~4: &#xd55c; &#xbc88; &#xb204;&#xb974;&#xba74; &#xc120;&#xd0dd;, &#xb450; &#xbc88; &#xb204;&#xb974;&#xba74; &#xbc1c;&#xc0ac;.</p></div><div class="settings"><h2>비행 설정</h2><label>VLS 초기 상승 <output id="boostValue">0.7 s</output><input id="boost" type="range" min="0.5" max="1" step="0.1" value="0.7"></label><label>재유도 선회 반응 <output id="turnValue">720 °/s</output><input id="turn" type="range" min="180" max="1440" step="30" value="720"></label><p class="note">일반 선회 가변 · 사거리 12,000 unit · 발사 간격 0.18초<br>게임 내부 물리의 복제가 아닌, 설명에 기반한 조절형 구현입니다.</p></div></section>
+<section class="settings"><label>선회 가속도 <output id="lateralValue">1000 unit/s²</output><input id="lateral" type="range" min="400" max="2200" step="50" value="1000"></label><label><input id="obstacles" type="checkbox" checked> 장애물 켜기</label><p class="note">장애물 위로 유도한 뒤 뒤쪽 표적으로 커서를 내려 우회 타격하세요. 커서를 진행 방향 옆·뒤로 움직이면 선회합니다. 속도가 높을수록 회전 반경이 커집니다.</p></section>
+<label><input id="aimAssist" type="checkbox" checked> &#xcee4;&#xc11c; &#xc870;&#xc900;&#xbcf4;&#xc815;</label><p class="note">233 &#x2192; 485: 0.93 s / &#xc120;&#xd68c; &#xc911; &#xac10;&#xc18d; / &#xba3c; &#xcee4;&#xc11c;&#xb85c; &#xc9c1;&#xc9c4; &#xc2dc; &#xcd5c;&#xb300;&#xc18d;&#xb3c4;</p><p class="note">1~4: &#xc2ac;&#xb86f; &#xc120;&#xd0dd; / &#xac19;&#xc740; &#xbc88;&#xd638;&#xb97c; 0.35&#xcd08; &#xc548;&#xc5d0; &#xb450; &#xbc88; &#xb204;&#xb974;&#xba74; &#xbc1c;&#xc0ac; (&#xd0a4;&#xbcf4;&#xb4dc;&#xb098; &#xbc84;&#xd2bc;)</p></main><script src="sim.js?v=14"></script><script src="camera.js?v=14"></script><script src="app.js?v=14"></script>
+
+</body></html>

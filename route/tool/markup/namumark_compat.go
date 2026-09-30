@@ -173,6 +173,12 @@ func Compat_html_safe_url(value string, iframe bool) string {
 	}
 	scheme := strings.ToLower(parsed.Scheme)
 	if iframe {
+		// Built-in minigames are served by this wiki under /views/minigame/.
+		if scheme == "" && parsed.Host == "" && parsed.User == nil &&
+			strings.HasPrefix(parsed.Path, "/views/minigame/") &&
+			!strings.Contains(parsed.Path, "..") && !strings.Contains(value, "\\") {
+			return value
+		}
 		if (scheme != "http" && scheme != "https") || parsed.Hostname() == "" || parsed.User != nil {
 			return ""
 		}
