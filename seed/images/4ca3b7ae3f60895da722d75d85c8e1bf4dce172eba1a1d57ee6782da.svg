@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 370" role="img" aria-labelledby="title desc">
+  <title id="title">SLBM crest</title>
+  <desc id="desc">Gold spread-wing eagle and laurel wreath above SLBM lettering on white.</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0.15" y2="1">
+      <stop offset="0" stop-color="#f8e5a0"/>
+      <stop offset="0.48" stop-color="#c29a3b"/>
+      <stop offset="1" stop-color="#9b7025"/>
+    </linearGradient>
+    <g id="leaf" fill="url(#gold)" stroke="#8a641f" stroke-width="1.5">
+      <path d="M0 0 C-15-17-36-18-48-5 C-33 12-13 13 0 0Z"/>
+      <path d="M-4-1L-42-5" fill="none" stroke="#8a641f" stroke-width="1"/>
+    </g>
+    <path id="wing" d="M311 111 C269 96 216 100 165 91 L78 71 C92 91 111 104 133 113 C105 108 80 113 59 127 C87 143 111 151 139 153 C113 161 97 173 87 189 C124 197 157 190 184 181 C165 197 152 209 144 224 C197 226 251 203 301 175Z"/>
+  </defs>
+  <rect width="640" height="370" fill="#ffffff"/>
+  <g fill="none" stroke="#b88b31" stroke-width="5" stroke-linecap="round">
+    <path d="M305 286 C224 270 161 224 124 166 C91 113 116 53 194 29"/>
+    <path d="M335 286 C416 270 479 224 516 166 C549 113 524 53 446 29"/>
+  </g>
+  <g>
+    <use href="#leaf" transform="translate(142 202) rotate(216)"/>
+    <use href="#leaf" transform="translate(126 170) rotate(238)"/>
+    <use href="#leaf" transform="translate(113 133) rotate(254)"/>
+    <use href="#leaf" transform="translate(114 97) rotate(280)"/>
+    <use href="#leaf" transform="translate(132 66) rotate(307)"/>
+    <use href="#leaf" transform="translate(162 43) rotate(327)"/>
+    <use href="#leaf" transform="translate(196 30) rotate(344)"/>
+    <use href="#leaf" transform="translate(220 253) rotate(204)"/>
+    <use href="#leaf" transform="translate(183 228) rotate(218)"/>
+    <use href="#leaf" transform="translate(156 195) rotate(230)"/>
+    <use href="#leaf" transform="translate(126 167) rotate(245)"/>
+    <use href="#leaf" transform="translate(112 129) rotate(266)"/>
+    <use href="#leaf" transform="translate(117 91) rotate(290)"/>
+    <use href="#leaf" transform="translate(142 57) rotate(315)"/>
+    <use href="#leaf" transform="translate(175 36) rotate(336)"/>
+    <use href="#leaf" transform="translate(498 202) scale(-1 1) rotate(216)"/>
+    <use href="#leaf" transform="translate(514 170) scale(-1 1) rotate(238)"/>
+    <use href="#leaf" transform="translate(527 133) scale(-1 1) rotate(254)"/>
+    <use href="#leaf" transform="translate(526 97) scale(-1 1) rotate(280)"/>
+    <use href="#leaf" transform="translate(508 66) scale(-1 1) rotate(307)"/>
+    <use href="#leaf" transform="translate(478 43) scale(-1 1) rotate(327)"/>
+    <use href="#leaf" transform="translate(444 30) scale(-1 1) rotate(344)"/>
+    <use href="#leaf" transform="translate(420 253) scale(-1 1) rotate(204)"/>
+    <use href="#leaf" transform="translate(457 228) scale(-1 1) rotate(218)"/>
+    <use href="#leaf" transform="translate(484 195) scale(-1 1) rotate(230)"/>
+    <use href="#leaf" transform="translate(514 167) scale(-1 1) rotate(245)"/>
+    <use href="#leaf" transform="translate(528 129) scale(-1 1) rotate(266)"/>
+    <use href="#leaf" transform="translate(523 91) scale(-1 1) rotate(290)"/>
+    <use href="#leaf" transform="translate(498 57) scale(-1 1) rotate(315)"/>
+    <use href="#leaf" transform="translate(465 36) scale(-1 1) rotate(336)"/>
+  </g>
+  <g fill="url(#gold)" stroke="#805d20" stroke-width="3" stroke-linejoin="round">
+    <use href="#wing"/>
+    <use href="#wing" transform="translate(640 0) scale(-1 1)"/>
+    <path d="M313 103 C297 91 296 73 307 60 C317 48 338 46 350 56 C361 65 360 80 350 90 L342 99 C359 121 365 155 359 184 C355 210 340 230 320 249 C301 230 285 210 281 184 C275 154 282 119 300 99Z"/>
+    <path d="M347 58 L374 63 L350 75Z"/>
+    <path d="M307 232 L291 256 L281 270 L301 265 L320 251 L339 265 L359 270 L349 256 L333 232Z"/>
+  </g>
+  <g fill="none" stroke="#8a641f" stroke-width="2" stroke-linecap="round">
+    <path d="M300 117L112 86M293 132L92 126M289 149L122 161M294 167L151 190M306 186L192 215"/>
+    <path d="M340 117L528 86M347 132L548 126M351 149L518 161M346 167L489 190M334 186L448 215"/>
+    <path d="M310 112L320 218M300 139L320 225M337 139L320 225"/>
+  </g>
+  <text x="320" y="346" text-anchor="middle" fill="url(#gold)" stroke="#805d20" stroke-width="1.5" paint-order="stroke" font-family="Georgia, 'Times New Roman', serif" font-size="78" font-weight="700" letter-spacing="5">SLBM</text>
+</svg>

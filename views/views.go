@@ -5,7 +5,7 @@ import (
 	"io/fs"
 )
 
-//go:embed main_css ringo
+//go:embed main_css ringo minigame
 var files embed.FS
 
 var BuiltinSkinList = []string{
