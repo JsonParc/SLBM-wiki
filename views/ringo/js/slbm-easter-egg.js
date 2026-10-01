@@ -1,7 +1,14 @@
 "use strict";
 (() => {
     const path = decodeURIComponent(window.location.pathname).replace(/\/+$/, '');
-    if (path !== '/w/JsonParc' && path !== '/JsonParc') return;
+    const effect_settings = {
+        '/w/JsonParc': {name: 'JsonParc', hue: 28, error: '[0x11 0000 0000] ERROR: Connection failed: Connection refused.'},
+        '/JsonParc': {name: 'JsonParc', hue: 28, error: '[0x11 0000 0000] ERROR: Connection failed: Connection refused.'},
+        '/w/뉴비에요': {name: '뉴비에요', hue: 2, error: '[0x11 000 000] ERROR: SuSnubaNohopeDja: Connection Refused'},
+        '/뉴비에요': {name: '뉴비에요', hue: 2, error: '[0x11 000 000] ERROR: SuSnubaNohopeDja: Connection Refused'},
+    };
+    const effect = effect_settings[path];
+    if (!effect) return;
 
     const glyphs = 'アカサタナハマヤラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>+-*/';
     let clicks = 0;
@@ -13,7 +20,7 @@
     function find_trigger() {
         const profile_table = document.querySelector('#main_data table.slbm-member-info');
         const header = profile_table?.querySelector('tbody > tr:first-child > td');
-        return header?.textContent.trim() === 'JsonParc' ? header : null;
+        return header?.textContent.trim() === effect.name ? header : null;
     }
 
     function resize() {
@@ -58,7 +65,7 @@
             context.font = `${font_size}px monospace`;
             positions.forEach((position, index) => {
                 if (finished[index]) return;
-                const hue = 28 + index % 13;
+                const hue = effect.hue + index % 13;
                 const brightness = 48 + (index * 17 % 10);
                 for (let trail = 0; trail < stream_lengths[index]; trail++) {
                     const character = glyphs[Math.floor(Math.random() * glyphs.length)];
@@ -99,7 +106,7 @@
         document.body.appendChild(terminal_overlay);
 
         const output = terminal_overlay.querySelector('.slbm-terminal-output');
-        const error_line = '[0x11 0000 0000] ERROR: Connection failed: Connection refused.';
+        const error_line = effect.error;
         const connecting_line = 'connecting...';
         const slow_line_count = 5;
         const total_line_count = 55;
