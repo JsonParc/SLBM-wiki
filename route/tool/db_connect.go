@@ -215,6 +215,10 @@ func QueryRow_DB(db DB_runner, query string, var_list []any, values ...any) bool
 	}
 }
 
+func DB_type() string {
+	return db_set["db_type"]
+}
+
 func DB_boot() map[string]string {
 	new_db_set := Get_DB_set()
 	if new_db_set["db_type"] == "mysql" {
@@ -228,7 +232,7 @@ func DB_boot() map[string]string {
 
 func DB_connect_init() (*sql.DB, error) {
 	if db_set["db_type"] == "sqlite" {
-		db, err := sql.Open("sqlite", filepath.Join(db_set["db_name"]+".db")+"?_journal_mode=WAL&_busy_timeout=5000")
+		db, err := sql.Open("sqlite", filepath.Join(db_set["db_name"]+".db")+"?_journal_mode=WAL&_busy_timeout=5000&_pragma=busy_timeout(5000)")
 		if err != nil {
 			return nil, err
 		}
@@ -258,7 +262,7 @@ func DB_connect() *sql.DB {
 	// log.Default().Println("DB open")
 
 	if db_set["db_type"] == "sqlite" {
-		db, err := sql.Open("sqlite", filepath.Join(db_set["db_name"]+".db")+"?_journal_mode=WAL&_busy_timeout=5000")
+		db, err := sql.Open("sqlite", filepath.Join(db_set["db_name"]+".db")+"?_journal_mode=WAL&_busy_timeout=5000&_pragma=busy_timeout(5000)")
 		if err != nil {
 			panic(err)
 		}

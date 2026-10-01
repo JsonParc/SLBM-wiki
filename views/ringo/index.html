@@ -12,7 +12,9 @@
         {{main_head|safe}}
         <script defer src="/views/ringo/js/main.js.cache_v3"></script>
         <script defer src="/views/ringo/js/slbm-sidebar.js.cache_v1"></script>
+        <script defer src="/views/ringo/js/slbm-easter-egg.js.cache_v3"></script>
         <link rel="stylesheet" href="/views/ringo/css/slbm-sidebar.css.cache_v1">
+        <link rel="stylesheet" href="/views/ringo/css/slbm-easter-egg.css.cache_v3">
         <script defer src="/views/ringo/js/skin_set.js.cache_v10"></script>
         <link rel="stylesheet" href="/views/ringo/css/main.css.cache_v13">
         {% if main_head_dark != '' %}
@@ -88,6 +90,24 @@
                             <span class="iconify" data-icon="ic:baseline-build" data-inline="true"></span>
                             {{'other_tool'|load_lang}}
                         </a>
+                        {% if slbm_clan_role %}
+                            <a href="/clan/penalty">
+                                <span class="iconify" data-icon="ic:baseline-gavel" data-inline="true"></span>
+                                {{'clan_penalty'|load_lang}}
+                            </a>
+                        {% endif %}
+                        {% if slbm_clan_role == 'admin' or slbm_clan_role == 'sus' %}
+                            <a href="/clan/staff">
+                                <span class="iconify" data-icon="ic:baseline-badge" data-inline="true"></span>
+                                {{'clan_staff'|load_lang}}
+                            </a>
+                        {% endif %}
+                        {% if slbm_clan_role == 'sus' or slbm_clan_role == 'manager' %}
+                            <a href="/app_submit">
+                                <span class="iconify" data-icon="ic:baseline-how-to-reg" data-inline="true"></span>
+                                {{'application_list'|load_lang}}
+                            </a>
+                        {% endif %}
                         {% if user_auth != '0' %}
                             <a href="/manager">
                                 <span class="iconify" data-icon="ic:baseline-how-to-reg" data-inline="true"></span>

@@ -1,0 +1,10 @@
+.slbm-matrix-trigger { cursor: pointer; }
+.slbm-matrix-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.16);
+    pointer-events: none;
+}

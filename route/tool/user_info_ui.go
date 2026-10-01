@@ -31,9 +31,25 @@ func Get_user_info_ui_internal(db *sql.DB, config Config, user_name string) stri
 		}
 	}
 
+	// Clan staff roles are stored apart from the wiki permission group, so show them on their own line.
+	clan_role_line := ""
+	if !IP_or_user(user_name) && Get_user_set_exists(db, user_name, "pw") {
+		role_key := "clan_role_none"
+		switch Get_clan_role(db, user_name) {
+		case Clan_role_admin:
+			role_key = "clan_role_admin"
+		case Clan_role_sus:
+			role_key = "clan_role_sus"
+		case Clan_role_manager:
+			role_key = "clan_role_manager"
+		}
+		clan_role_line = `<div class="slbm-clan-role">` + Get_language(db, "clan_role", true) + `: ` + Get_language(db, role_key, true) + `</div>`
+	}
+
 	level_data := Get_level(db, user_name)
 	return `<div class="user_info_table">` + Get_language(db, "user_name", false) + `: ` + Get_user_profile_image_ui(db, user_name) + online_icon + IP_parser(db, user_name, config.IP) + `</div>` +
 		`<div>` + Get_language(db, "authority", false) + `: ` + HTML_escape(auth_name) + `</div>` +
+		clan_role_line +
 		`<div>` + Get_language(db, "state", false) + `: ` + ban_state + `</div>` +
 		`<div>` + Get_language(db, "level", false) + `: ` + HTML_escape(level_data[0]) + ` (` + HTML_escape(level_data[1]) + ` / ` + HTML_escape(level_data[2]) + `)</div>`
 }

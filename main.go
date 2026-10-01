@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"time"
+	_ "time/tzdata"
 
 	"opennamu/route"
 	"opennamu/route/tool"
@@ -93,7 +94,14 @@ func Wait_startup_delay() {
 }
 
 func main() {
+	// Timestamps are stored and sorted as local-time strings, so pin KST
+	// regardless of the host timezone (Render runs in UTC).
+	if loc, err := time.LoadLocation("Asia/Seoul"); err == nil {
+		time.Local = loc
+	}
+
 	tool.Set_builtin_version_data(builtin_version_json)
+	tool.Seed_slbm_data_dir()
 
 	if len(os.Args) > 1 && os.Args[1] == "--opennamu-update" {
 		os.Exit(route.Run_server_update(os.Args[2:]))

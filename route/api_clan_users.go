@@ -62,6 +62,30 @@ func Api_clan_users(config tool.Config) ([]Clan_user, error) {
 	return users, nil
 }
 
+// Clan_ban_tx bans or unbans the subjects (account IDs or IPs). A new account
+// ban also revokes the account's existing login sessions.
+func Clan_ban_tx(tx *sql.Tx, config tool.Config, user_id string, subjects []string, includes_account bool, unban bool) error {
+	if !unban && includes_account {
+		if _, err := tx.Exec(tool.DB_change("delete from user_set where id = ? and name = 'slbm_session_epoch'"), user_id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(tool.DB_change("insert into user_set (id, name, data) values (?, 'slbm_session_epoch', ?)"), user_id, tool.Get_random_key(32)); err != nil {
+			return err
+		}
+	}
+	for _, subject := range subjects {
+		if unban {
+			var group string
+			tool.QueryRow_DB(tx, "select data from user_set where id = ? and name = 'acl'", []any{&group}, subject)
+			if !tool.Auth_group_name_ban(group) {
+				continue
+			}
+		}
+		tool.Do_auth_insert(tx, subject, "", "SLBM user management", "ban_without_site", config.IP, "", unban)
+	}
+	return nil
+}
+
 func Api_clan_user_post(config tool.Config, values url.Values) error {
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
@@ -113,23 +137,8 @@ func Api_clan_user_post(config tool.Config, values url.Values) error {
 	return tool.DB_transaction(db, func(tx *sql.Tx) error {
 		switch action {
 		case "ban", "unban":
-			if action == "ban" && (target == "account" || target == "both") {
-				if _, err := tx.Exec(tool.DB_change("delete from user_set where id = ? and name = 'slbm_session_epoch'"), user_id); err != nil {
-					return err
-				}
-				if _, err := tx.Exec(tool.DB_change("insert into user_set (id, name, data) values (?, 'slbm_session_epoch', ?)"), user_id, tool.Get_random_key(32)); err != nil {
-					return err
-				}
-			}
-			for _, subject := range targets {
-				if action == "unban" {
-					var group string
-					tool.QueryRow_DB(tx, "select data from user_set where id = ? and name = 'acl'", []any{&group}, subject)
-					if !tool.Auth_group_name_ban(group) {
-						continue
-					}
-				}
-				tool.Do_auth_insert(tx, subject, "", "SLBM user management", "ban_without_site", config.IP, "", action == "unban")
+			if err := Clan_ban_tx(tx, config, user_id, targets, target == "account" || target == "both", action == "unban"); err != nil {
+				return err
 			}
 		case "delete":
 			if _, err := tx.Exec(tool.DB_change("delete from user_set where id = ?"), user_id); err != nil {

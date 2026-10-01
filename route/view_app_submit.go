@@ -11,7 +11,7 @@ func View_app_submit(config tool.Config, values url.Values) string {
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
 
-	if values == nil && !tool.Check_permission(db, "application_manage", config.IP) {
+	if values == nil && !Clan_app_permission(db, "application_manage", config.IP) {
 		return tool.Get_error_page(db, config, "auth")
 	}
 	if values == nil {
@@ -66,7 +66,7 @@ func View_app_submit(config tool.Config, values url.Values) string {
 		data += tool.Get_language(db, "no_applications_now", true)
 	} else {
 		data += tool.Get_language(db, "all_register_num", true) + " : " + strconv.Itoa(len(applications))
-		if !tool.Check_permission(db, "application_view", config.IP) {
+		if !Clan_app_permission(db, "application_view", config.IP) {
 			data += `<hr class="main_hr">` + tool.Get_language(db, "application_detail_hidden", true)
 		} else {
 			data += `<hr class="main_hr">`

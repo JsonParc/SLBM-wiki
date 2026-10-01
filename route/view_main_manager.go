@@ -21,7 +21,7 @@ func View_main_manager(config tool.Config) string {
 	}
 	backup_menu := ""
 	if Clan_admin(db, config) {
-		backup_menu = `<li><a href="/clan/hall">` + lang("clan_hall_manage") + `</a></li>`
+		backup_menu = `<li><a href="/clan/hall">` + lang("clan_hall_manage") + `</a></li><li><a href="/clan/backup">` + lang("clan_backup") + `</a></li>`
 	}
 	if tool.Check_permission(db, "admin", config.IP) {
 		backup_menu += `<li><a href="/clan/users">` + lang("clan_users") + `</a></li><li><a href="/backup">` + lang("document_backup") + `</a></li>`

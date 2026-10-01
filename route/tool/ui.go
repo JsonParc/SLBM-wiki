@@ -196,6 +196,7 @@ func Get_template(db *sql.DB, config Config, name string, data string, other []a
 		"user_auth":        imp_2[9],
 		"slbm_admin":       !IP_or_user(config.IP) && Check_permission(db, "admin", config.IP),
 		"slbm_member":      !IP_or_user(config.IP) && Get_user_set_exists(db, config.IP, "pw"),
+		"slbm_clan_role":   Get_clan_role(db, config.IP),
 		"user_ip":          imp_2[10],
 		"user_discuss":     imp_2[11],
 		"user_path":        path,

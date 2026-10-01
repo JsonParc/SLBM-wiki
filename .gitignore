@@ -7,6 +7,7 @@ backend.log
 /tmp/*
 
 *.db
+!/data.db
 *.db-shm
 *.db-wal
 
@@ -21,3 +22,5 @@ data/bleve/
 data/bleve.version
 data/bleve_bbs/
 data/bleve_bbs.version
+
+/data/backups/
