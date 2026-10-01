@@ -52,6 +52,21 @@
     animation-delay: var(--glitch-delay, 0s);
     text-shadow: 2px 0 rgba(0, 210, 255, .5), -2px 0 rgba(255, 0, 80, .55), 0 0 6px rgba(255, 0, 0, .8);
 }
+.slbm-terminal-overlay.is-blue-screen {
+    background: #174a9c;
+    color: rgba(255, 255, 255, .78);
+}
+.slbm-terminal-overlay.is-blue-screen .slbm-terminal-window,
+.slbm-terminal-overlay.is-blue-screen .slbm-terminal-title {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: rgba(255, 255, 255, .78);
+}
+.slbm-terminal-overlay.is-blue-screen .slbm-terminal-line {
+    color: rgba(255, 255, 255, .78);
+    text-shadow: 2px 0 rgba(180, 210, 255, .45), -2px 0 rgba(20, 45, 120, .6), 0 0 6px rgba(0, 20, 90, .65);
+}
 .slbm-terminal-overlay.is-noisy::after {
     content: '';
     position: absolute;
@@ -62,6 +77,9 @@
     animation: slbm-terminal-noise .055s steps(2) infinite;
 }
 .slbm-terminal-overlay.is-noisy .slbm-terminal-window { animation: slbm-terminal-shake .045s steps(2) infinite; }
+.slbm-terminal-overlay.is-blue-screen.is-noisy::after {
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(255,255,255,.16) 3px, transparent 4px), repeating-linear-gradient(90deg, rgba(180,210,255,.1) 0 1px, transparent 2px 5px);
+}
 .slbm-terminal-overlay.is-flash { background: #fff; transition: background .08s linear; }
 .slbm-terminal-overlay.is-flash .slbm-terminal-window { opacity: 0; }
 .slbm-terminal-overlay.is-black { background: #000; }

@@ -6,6 +6,8 @@
         '/JsonParc': {name: 'JsonParc', hue: 28, error: '[0x11 0000 0000] ERROR: Connection failed: Connection refused.'},
         '/w/뉴비에요': {name: '뉴비에요', hue: 2, error: '[0x11 000 000] ERROR: SuSnubaNohopeDja: Connection Refused'},
         '/뉴비에요': {name: '뉴비에요', hue: 2, error: '[0x11 000 000] ERROR: SuSnubaNohopeDja: Connection Refused'},
+        '/w/maelstrom': {name: 'maelstrom', hue: 28, error: '[0x11 000 000] ERROR: Furina-Virus Detected', screen: 'blue'},
+        '/maelstrom': {name: 'maelstrom', hue: 28, error: '[0x11 000 000] ERROR: Furina-Virus Detected', screen: 'blue'},
     };
     const effect = effect_settings[path];
     if (!effect) return;
@@ -101,7 +103,7 @@
     function start_terminal_sequence() {
         if (terminal_overlay) return;
         terminal_overlay = document.createElement('div');
-        terminal_overlay.className = 'slbm-terminal-overlay';
+        terminal_overlay.className = `slbm-terminal-overlay${effect.screen === 'blue' ? ' is-blue-screen' : ''}`;
         terminal_overlay.innerHTML = '<div class="slbm-terminal-window"><div class="slbm-terminal-title">C:\\Windows\\System32\\cmd.exe</div><div class="slbm-terminal-output"></div></div>';
         document.body.appendChild(terminal_overlay);
 
