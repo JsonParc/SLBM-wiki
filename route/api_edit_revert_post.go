@@ -34,7 +34,7 @@ func Api_edit_revert_post(config tool.Config, doc_name string, rev string, send 
 		return_data["response"] = "require auth"
 
 		return return_data
-	} else if !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
+	} else if !tool.Can_access_document(db, config.IP, doc_name) || !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
 		return_data["response"] = "require auth"
 
 		return return_data

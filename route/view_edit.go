@@ -10,7 +10,7 @@ func View_edit(config tool.Config, doc_name string, load_doc_name string) string
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
 
-	if !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
+	if !tool.Can_access_document(db, config.IP, doc_name) || !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
 		return tool.Get_error_page(db, config, "auth")
 	}
 

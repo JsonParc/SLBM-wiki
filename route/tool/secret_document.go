@@ -31,3 +31,7 @@ func Filter_secret_document_titles(db *sql.DB, user_id string, titles []string) 
 	}
 	return filtered
 }
+
+func Can_access_document(db *sql.DB, user_id string, doc_name string) bool {
+	return !Is_secret_document(db, doc_name) || Can_view_secret_document(db, user_id)
+}

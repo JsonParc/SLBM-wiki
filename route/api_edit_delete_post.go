@@ -12,7 +12,7 @@ func Api_edit_delete_post(config tool.Config, doc_name string, send string, agre
 	defer tool.DB_close(db)
 
 	return_data := make(map[string]any)
-	if !tool.Check_acl(db, doc_name, "", "document_delete", config.IP) {
+	if !tool.Can_access_document(db, config.IP, doc_name) || !tool.Check_acl(db, doc_name, "", "document_delete", config.IP) {
 		return_data["response"] = "require auth"
 
 		return return_data

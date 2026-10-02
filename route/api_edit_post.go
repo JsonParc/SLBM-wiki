@@ -29,7 +29,7 @@ func Api_edit_post(config tool.Config, doc_name string, data string, send string
 		return_data["data"] = "title length"
 
 		return return_data
-	} else if !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
+	} else if !tool.Can_access_document(db, config.IP, doc_name) || !tool.Check_acl(db, doc_name, "", "document_edit", config.IP) {
 		return_data["response"] = "error"
 		return_data["data"] = "permission denied"
 

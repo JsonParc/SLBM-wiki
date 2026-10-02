@@ -8,7 +8,7 @@ func View_edit_delete(config tool.Config, doc_name string) string {
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
 
-	if !tool.Check_acl(db, doc_name, "", "document_delete", config.IP) {
+	if !tool.Can_access_document(db, config.IP, doc_name) || !tool.Check_acl(db, doc_name, "", "document_delete", config.IP) {
 		return tool.Get_error_page(db, config, "auth")
 	}
 
