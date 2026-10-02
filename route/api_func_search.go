@@ -61,6 +61,8 @@ func Api_func_search_ui(config tool.Config, title_list []string, keyword string,
 }
 
 func Api_func_search(config tool.Config, keyword string, num_str string, search_type string) map[string]any {
+	db := tool.DB_connect()
+	defer tool.DB_close(db)
 	page := tool.Str_to_int(num_str)
 	num := 0
 	if page*50 > 0 {
@@ -79,6 +81,7 @@ func Api_func_search(config tool.Config, keyword string, num_str string, search_
 
 	if keyword != "" {
 		if title_list, ok := tool.Search_index_search(name, search_type, num, 51); ok {
+			title_list = tool.Filter_secret_document_titles(db, config.IP, title_list)
 			has_next := len(title_list) > 50
 			if has_next {
 				title_list = title_list[:50]
@@ -90,9 +93,6 @@ func Api_func_search(config tool.Config, keyword string, num_str string, search_
 			}
 		}
 	}
-
-	db := tool.DB_connect()
-	defer tool.DB_close(db)
 
 	title_list := []string{}
 	rows := tool.Query_DB(
@@ -110,7 +110,9 @@ func Api_func_search(config tool.Config, keyword string, num_str string, search_
 			panic(err)
 		}
 
-		title_list = append(title_list, title)
+		if !tool.Is_secret_document(db, title) || tool.Can_view_secret_document(db, config.IP) {
+			title_list = append(title_list, title)
+		}
 	}
 
 	has_next := len(title_list) > 50

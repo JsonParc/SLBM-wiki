@@ -211,6 +211,15 @@ func View_w(c *gin.Context, config tool.Config, doc_name string, view_type strin
 	if tool.Check_permission(db, "doc_watch_list_view", config.IP) {
 		menu = append(menu, []any{"doc_watch_list/1/" + tool.Url_parser(doc_name), tool.Get_language(db, "watch_user_list", true)})
 	}
+	if status == http.StatusOK && tool.Can_manage_secret_document(db, config.IP) {
+		secret_action := "set"
+		secret_label := "secret_document_set"
+		if tool.Is_secret_document(db, doc_name) {
+			secret_action = "unset"
+			secret_label = "secret_document_unset"
+		}
+		menu = append(menu, []any{"secret_document/" + secret_action + "/" + tool.Url_parser(doc_name), tool.Get_language(db, secret_label, true)})
+	}
 
 	enable_comment := tool.Get_setting(db, "enable_comment", "")
 	if status == http.StatusOK && len(enable_comment) > 0 && enable_comment[0][0] != "" {

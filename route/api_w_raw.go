@@ -10,9 +10,13 @@ func Api_w_raw(config tool.Config, doc_name string, exist_check string, rev stri
 
 	new_data := make(map[string]any)
 
-	if rev != "" && !tool.Check_permission(db, "history_view", config.IP) {
+	secret_document := tool.Is_secret_document(db, doc_name)
+	can_view_secret := tool.Can_view_secret_document(db, config.IP)
+	if secret_document && !can_view_secret {
+		new_data["response"] = "not exist"
+	} else if rev != "" && !tool.Check_permission(db, "history_view", config.IP) {
 		new_data["response"] = "require auth"
-	} else if !tool.Check_acl(db, doc_name, "", "render", config.IP) {
+	} else if !secret_document && !tool.Check_acl(db, doc_name, "", "render", config.IP) {
 		new_data["response"] = "require auth"
 	} else if exist_check != "" {
 		title := ""

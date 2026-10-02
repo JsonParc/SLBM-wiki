@@ -27,6 +27,8 @@ func Clan_role_label(lang func(string) string, role string) string {
 		return lang("clan_role_sus")
 	case tool.Clan_role_manager:
 		return lang("clan_role_manager")
+	case tool.Clan_role_guard:
+		return lang("clan_role_guard")
 	}
 	return lang("clan_role_none")
 }

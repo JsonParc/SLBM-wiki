@@ -51,15 +51,20 @@ func clan_staff_can_manage(caller string, caller_role string, target string, tar
 		return true
 	case tool.Clan_role_sus:
 		return target_role != tool.Clan_role_sus
+	case tool.Clan_role_manager:
+		return target_role == tool.Clan_role_guard
 	}
 	return false
 }
 
 func clan_staff_role_choices(caller_role string) []string {
 	if caller_role == tool.Clan_role_admin {
-		return []string{"", tool.Clan_role_manager, tool.Clan_role_sus}
+		return []string{"", tool.Clan_role_manager, tool.Clan_role_guard, tool.Clan_role_sus}
 	}
-	return []string{"", tool.Clan_role_manager}
+	if caller_role == tool.Clan_role_sus || caller_role == tool.Clan_role_manager {
+		return []string{"", tool.Clan_role_guard}
+	}
+	return []string{}
 }
 
 func clan_staff_target_role(db *sql.DB, user_id string) string {
@@ -74,7 +79,7 @@ func Api_clan_staff(config tool.Config) (Clan_staff_page, error) {
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
 	page.Caller_role = tool.Get_clan_role(db, config.IP)
-	if page.Caller_role != tool.Clan_role_admin && page.Caller_role != tool.Clan_role_sus {
+	if page.Caller_role != tool.Clan_role_admin && page.Caller_role != tool.Clan_role_sus && page.Caller_role != tool.Clan_role_manager {
 		return page, errors.New("require auth")
 	}
 	page.Role_choices = clan_staff_role_choices(page.Caller_role)
@@ -109,7 +114,7 @@ func Api_clan_staff_post(config tool.Config, values url.Values) error {
 	db := tool.DB_connect()
 	defer tool.DB_close(db)
 	caller_role := tool.Get_clan_role(db, config.IP)
-	if caller_role != tool.Clan_role_admin && caller_role != tool.Clan_role_sus {
+	if caller_role != tool.Clan_role_admin && caller_role != tool.Clan_role_sus && caller_role != tool.Clan_role_manager {
 		return errors.New("require auth")
 	}
 	token, _ := config.Session.Get("clan_csrf").(string)

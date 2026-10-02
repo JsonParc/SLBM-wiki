@@ -55,6 +55,11 @@ func Register_wiki_routes(r *gin.Engine) {
 		Write_data(c, status_code, "text/html; charset=utf-8", []byte(route_data))
 	})
 
+	r.GET("/secret_document/:action/*doc_name", func(c *gin.Context) {
+		route_data := route.Secret_document_redirect(Make_route_config(c), c.Param("action"), strings.TrimPrefix(c.Param("doc_name"), "/"))
+		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route_data))
+	})
+
 	r.GET("/down/*doc_name", func(c *gin.Context) {
 		route_data := route.View_w_down(Make_route_config(c), strings.TrimPrefix(c.Param("doc_name"), "/"))
 		Write_data(c, http.StatusOK, "text/html; charset=utf-8", []byte(route_data))

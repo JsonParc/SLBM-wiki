@@ -7,12 +7,13 @@ import "database/sql"
 const Clan_role_admin = "admin"
 const Clan_role_sus = "sus"
 const Clan_role_manager = "manager"
+const Clan_role_guard = "guard"
 
 // Get_stored_clan_role returns the saved staff role, ignoring site admin status.
 func Get_stored_clan_role(db DB_runner, user_id string) string {
 	role := ""
 	QueryRow_DB(db, "select data from user_set where id = ? and name = 'slbm_clan_role' limit 1", []any{&role}, user_id)
-	if role == Clan_role_sus || role == Clan_role_manager {
+	if role == Clan_role_sus || role == Clan_role_manager || role == Clan_role_guard {
 		return role
 	}
 	return ""

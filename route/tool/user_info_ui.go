@@ -42,6 +42,8 @@ func Get_user_info_ui_internal(db *sql.DB, config Config, user_name string) stri
 			role_key = "clan_role_sus"
 		case Clan_role_manager:
 			role_key = "clan_role_manager"
+		case Clan_role_guard:
+			role_key = "clan_role_guard"
 		}
 		clan_role_line = `<div class="slbm-clan-role">` + Get_language(db, "clan_role", true) + `: ` + Get_language(db, role_key, true) + `</div>`
 	}
